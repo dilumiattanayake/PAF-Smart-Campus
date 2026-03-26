@@ -64,4 +64,9 @@ public class BookingController {
     public ResponseEntity<BookingResponse> cancel(@PathVariable String id) {
         return ResponseEntity.ok(bookingService.cancel(id));
     }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<BookingResponse> update(@PathVariable String id, @Valid @RequestBody BookingCreateRequest request) {
+        return ResponseEntity.ok(bookingService.update(id, request));
+    }
 }

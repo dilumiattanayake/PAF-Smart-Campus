@@ -7,9 +7,11 @@ import { CheckCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
 import type { Notification } from '@/types';
+import { useNavigate } from 'react-router-dom';
 
 const NotificationsPage = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(false);
@@ -45,6 +47,20 @@ const NotificationsPage = () => {
     notificationService.markAsRead(id).catch(() => {});
   };
 
+  const goToNotification = (n: Notification) => {
+    const base = n.type?.toString();
+    if (base?.startsWith('TICKET') || base === 'COMMENT') {
+      if (n.referenceId) navigate(`/tickets/${n.referenceId}`);
+      else navigate('/tickets');
+    } else if (base?.startsWith('BOOKING')) {
+      if (n.referenceId) navigate(`/bookings/${n.referenceId}`);
+      else navigate('/bookings');
+    } else {
+      navigate('/notifications');
+    }
+    markRead(n.id);
+  };
+
   const typeIcon: Record<string, string> = {
     BOOKING: '📅',
     BOOKING_STATUS: '📅',
@@ -74,7 +90,7 @@ const NotificationsPage = () => {
         {loading && <p className="text-sm text-muted-foreground">Loading notifications...</p>}
         {!loading && filtered.length === 0 && <p className="text-sm text-muted-foreground">No notifications.</p>}
         {!loading && filtered.map(n => (
-          <Card key={n.id} className={`cursor-pointer transition-colors ${!n.isRead ? 'border-primary/30 bg-primary/5' : ''}`} onClick={() => markRead(n.id)}>
+          <Card key={n.id} className={`cursor-pointer transition-colors ${!n.isRead ? 'border-primary/30 bg-primary/5' : ''}`} onClick={() => goToNotification(n)}>
             <CardContent className="flex items-start gap-3 py-4">
               <span className="text-xl">{typeIcon[n.type] || '📢'}</span>
               <div className="flex-1 min-w-0">

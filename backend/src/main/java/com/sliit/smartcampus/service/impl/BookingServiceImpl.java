@@ -164,6 +164,44 @@ public class BookingServiceImpl implements BookingService {
         return toResponseWithNames(booking);
     }
 
+    @Override
+    public BookingResponse update(String id, BookingCreateRequest request) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
+        if (!booking.getUserId().equals(userId) && role != Role.ADMIN) {
+            throw new ForbiddenException("Not allowed to edit this booking");
+        }
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new ConflictException("Only pending bookings can be edited");
+        }
+        if (!request.getStartTime().isBefore(request.getEndTime())) {
+            throw new ConflictException("Start time must be before end time");
+        }
+        var resource = resourceRepository.findById(request.getResourceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+        ensureNoConflict(Booking.builder()
+                        .id(id)
+                        .resourceId(request.getResourceId())
+                        .bookingDate(request.getBookingDate())
+                        .startTime(request.getStartTime())
+                        .endTime(request.getEndTime())
+                        .build(),
+                id);
+
+        booking.setResourceId(request.getResourceId());
+        booking.setPurpose(request.getPurpose());
+        booking.setBookingDate(request.getBookingDate());
+        booking.setStartTime(request.getStartTime());
+        booking.setEndTime(request.getEndTime());
+        booking.setAttendeeCount(request.getAttendeeCount());
+        booking.setNotes(request.getNotes());
+        booking.setResourceName(resource.getName());
+        bookingRepository.save(booking);
+        return toResponseWithNames(booking);
+    }
+
     private void ensureNoConflict(Booking booking, String currentBookingId) {
         List<Booking> conflicts = bookingRepository.findByResourceIdAndBookingDateAndStatusIn(
                 booking.getResourceId(),

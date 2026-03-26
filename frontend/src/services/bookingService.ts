@@ -55,4 +55,8 @@ export const bookingService = {
     const { data } = await api.patch(`/api/bookings/${id}/cancel`, {});
     return mapBooking(data);
   },
+  update: async (id: string, data: { resourceId: string; purpose: string; bookingDate: string; startTime: string; endTime: string; attendeeCount: number; notes?: string }): Promise<Booking> => {
+    const { data: updated } = await api.patch(`/api/bookings/${id}`, data);
+    return mapBooking(updated);
+  },
 };

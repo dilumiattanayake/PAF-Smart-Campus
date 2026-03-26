@@ -20,6 +20,10 @@ export const TechnicianDashboard = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <div className="rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white p-5 shadow-md">
+        <p className="text-xs uppercase tracking-wide opacity-80">Technician view</p>
+        <h2 className="text-2xl font-semibold mt-1">Triage, prioritize, and close tickets faster</h2>
+      </div>
       <PageHeader title="Technician Dashboard" description="Your assigned tasks and work progress" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,12 +1,16 @@
-import { Building2, CalendarDays, Wrench, Users, ArrowRight, Plus } from 'lucide-react';
+import { Building2, CalendarDays, Wrench, Users, ArrowRight, Plus, Ban } from 'lucide-react';
 import { StatCard } from '@/components/shared/StatCard';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockResources, mockBookings, mockTickets, mockUsers } from '@/data/mockData';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import { resourceService } from '@/services/resourceService';
+import { bookingService } from '@/services/bookingService';
+import type { Booking, Resource } from '@/types';
+import { BookingCalendar } from '@/components/bookings/BookingCalendar';
 
 const resourceUsage = [
   { name: 'Lecture Halls', usage: 85 },
@@ -16,20 +20,30 @@ const resourceUsage = [
   { name: 'Sports', usage: 45 },
 ];
 
-const ticketByStatus = [
-  { name: 'Open', value: mockTickets.filter(t => t.status === 'OPEN').length },
-  { name: 'In Progress', value: mockTickets.filter(t => t.status === 'IN_PROGRESS').length },
-  { name: 'Resolved', value: mockTickets.filter(t => t.status === 'RESOLVED').length },
-  { name: 'Closed', value: mockTickets.filter(t => t.status === 'CLOSED').length },
-];
-
 const COLORS = ['hsl(210, 70%, 50%)', 'hsl(38, 92%, 50%)', 'hsl(152, 60%, 38%)', 'hsl(215, 12%, 50%)'];
 
 export const AdminDashboard = () => {
-  const pendingBookings = mockBookings.filter(b => b.status === 'PENDING');
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const pendingBookings = bookings.filter(b => b.status === 'PENDING');
+
+  useEffect(() => {
+    (async () => {
+      const res = await resourceService.getAll();
+      setResources(res);
+      const bks = await bookingService.getAll();
+      setBookings(bks);
+    })();
+  }, []);
+
+  const ticketByStatus = []; // placeholder if ticket API needed later
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <div className="rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-500 text-white p-5 shadow-md">
+        <p className="text-xs uppercase tracking-wide opacity-80">Admin control center</p>
+        <h2 className="text-2xl font-semibold mt-1">Approve bookings, track resources, oversee ops</h2>
+      </div>
       <PageHeader
         title="Admin Dashboard"
         description="System overview and management controls"
@@ -37,48 +51,20 @@ export const AdminDashboard = () => {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Resources" value={mockResources.length} icon={Building2} trend={{ value: 5, positive: true }} />
+        <StatCard title="Total Resources" value={resources.length} icon={Building2} />
         <StatCard title="Pending Bookings" value={pendingBookings.length} icon={CalendarDays} description="Awaiting approval" />
-        <StatCard title="Active Tickets" value={mockTickets.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length} icon={Wrench} />
-        <StatCard title="Total Users" value={mockUsers.length} icon={Users} trend={{ value: 8, positive: true }} />
+        <StatCard title="Approved Bookings" value={bookings.filter(b => b.status === 'APPROVED').length} icon={Wrench} />
+        <StatCard title="Rejected Bookings" value={bookings.filter(b => b.status === 'REJECTED').length} icon={Ban} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Resource Usage Chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Resource Utilization (%)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={resourceUsage}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                <YAxis tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                <Tooltip />
-                <Bar dataKey="usage" fill="hsl(174, 62%, 38%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Ticket Overview */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Tickets by Status</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie data={ticketByStatus} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                  {ticketByStatus.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Bookings Calendar</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BookingCalendar bookings={bookings} />
+        </CardContent>
+      </Card>
 
       {/* Booking Approval Queue */}
       <Card>

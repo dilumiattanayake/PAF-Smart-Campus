@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useEffect, useState } from 'react';
 import { notificationService } from '@/services/notificationService';
 import type { Notification } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 export const AppTopbar = () => {
   const { user, logout } = useAuth();
@@ -20,6 +21,7 @@ export const AppTopbar = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const unreadCount = notifications.filter(n => !n.isRead).length;
+  const { toast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -31,6 +33,44 @@ export const AppTopbar = () => {
       }
     })();
   }, []);
+
+  // Poll for new notifications and surface as toast
+  useEffect(() => {
+    const seen = new Set<string>(notifications.map(n => n.id));
+    const interval = setInterval(async () => {
+      try {
+        const data = await notificationService.getAll();
+        const newOnes = data.filter(n => !seen.has(n.id) && !n.isRead);
+        newOnes.forEach(n => {
+          toast({
+            title: n.title,
+            description: n.message,
+          });
+        });
+        setNotifications(data);
+      } catch {
+        /* ignore */
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [notifications, toast]);
+
+  const goToNotification = async (n: Notification) => {
+    const base = n.type?.toString();
+    if (base?.startsWith('TICKET') || base === 'COMMENT') {
+      if (n.referenceId) navigate(`/tickets/${n.referenceId}`);
+      else navigate('/tickets');
+    } else if (base?.startsWith('BOOKING')) {
+      if (n.referenceId) navigate(`/bookings/${n.referenceId}`);
+      else navigate('/bookings');
+    } else {
+      navigate('/notifications');
+    }
+    try {
+      await notificationService.markAsRead(n.id);
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, isRead: true } : x));
+    } catch { /* ignore */ }
+  };
 
   const getBreadcrumb = () => {
     const path = location.pathname;
@@ -86,7 +126,11 @@ export const AppTopbar = () => {
             </div>
             <div className="max-h-72 overflow-y-auto">
               {notifications.slice(0, 5).map(n => (
-                <div key={n.id} className={`px-4 py-3 border-b last:border-0 ${!n.isRead ? 'bg-primary/5' : ''}`}>
+                <div
+                  key={n.id}
+                  className={`px-4 py-3 border-b last:border-0 ${!n.isRead ? 'bg-primary/5' : ''} cursor-pointer`}
+                  onClick={() => goToNotification(n)}
+                >
                   <p className="text-sm font-medium">{n.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                 </div>

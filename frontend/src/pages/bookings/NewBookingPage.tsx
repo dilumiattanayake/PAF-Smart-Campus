@@ -35,6 +35,7 @@ const NewBookingPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [params] = useSearchParams();
+  const editId = params.get('editId');
   const [loading, setLoading] = useState(false);
   const [resources, setResources] = useState<Resource[]>([]);
   const [form, setForm] = useState({
@@ -50,6 +51,22 @@ const NewBookingPage = () => {
       setResources(res);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      const booking = await bookingService.getById(editId);
+      setForm({
+        resourceId: booking.resourceId,
+        purpose: booking.purpose,
+        bookingDate: booking.bookingDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        attendeeCount: booking.attendeeCount?.toString() || '',
+        notes: booking.notes || '',
+      });
+    })();
+  }, [editId]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -68,23 +85,39 @@ const NewBookingPage = () => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await bookingService.create({
-      resourceId: form.resourceId,
-      purpose: form.purpose,
-      bookingDate: form.bookingDate,
-      startTime: form.startTime,
-      endTime: form.endTime,
-      attendeeCount: Number(form.attendeeCount),
-      notes: form.notes,
-    });
-    setLoading(false);
-    toast({ title: 'Booking submitted!', description: 'Your booking request is pending approval.' });
-    navigate('/bookings');
+    try {
+      const payload = {
+        resourceId: form.resourceId,
+        purpose: form.purpose,
+        bookingDate: form.bookingDate,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        attendeeCount: Number(form.attendeeCount),
+        notes: form.notes,
+      };
+      if (editId) {
+        await bookingService.update(editId, payload);
+        toast({ title: 'Booking updated', description: 'Your booking was updated successfully.' });
+      } else {
+        await bookingService.create(payload);
+        toast({ title: 'Booking submitted!', description: 'Your booking request is pending approval.' });
+      }
+      navigate('/bookings');
+    } catch (err: any) {
+      const conflict = err?.response?.status === 409;
+      toast({
+        title: conflict ? 'Time clash detected' : 'Unable to save booking',
+        description: conflict ? 'This slot is already booked for the selected resource.' : 'Please try again or contact admin.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
-      <PageHeader title="Create New Booking" description="Request a campus resource" />
+      <PageHeader title={editId ? 'Update Booking' : 'Create New Booking'} description={editId ? 'Edit your pending booking before approval.' : 'Request a campus resource'} />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">

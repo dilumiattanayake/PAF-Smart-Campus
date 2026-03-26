@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchFilterBar } from '@/components/shared/SearchFilterBar';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -14,9 +14,12 @@ import { bookingService } from '@/services/bookingService';
 import { resourceService } from '@/services/resourceService';
 import type { Booking } from '@/types';
 import { BookingCalendar } from '@/components/bookings/BookingCalendar';
+import { useToast } from '@/hooks/use-toast';
 
 const BookingListPage = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [tab, setTab] = useState<'all' | 'mine'>(user?.role === 'ADMIN' ? 'all' : 'mine');
@@ -112,6 +115,7 @@ const BookingListPage = () => {
                   <TableHead>Time</TableHead>
                   <TableHead>Attendees</TableHead>
                   <TableHead>Status</TableHead>
+                  {user?.role === 'USER' && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -124,6 +128,26 @@ const BookingListPage = () => {
                     <TableCell className="font-mono text-xs">{b.startTime}–{b.endTime}</TableCell>
                     <TableCell className="tabular-nums">{b.attendeeCount}</TableCell>
                     <TableCell><StatusBadge status={b.status} /></TableCell>
+                    {user?.role === 'USER' && (
+                      <TableCell>
+                        {b.status === 'PENDING' ? (
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/bookings/new?editId=${b.id}`)}>Edit</Button>
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => {
+                              try {
+                                await bookingService.cancel(b.id);
+                                toast({ title: 'Booking cancelled' });
+                                load(tab, statusFilter);
+                              } catch {
+                                toast({ title: 'Unable to cancel', variant: 'destructive' });
+                              }
+                            }}>Cancel</Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Locked</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
