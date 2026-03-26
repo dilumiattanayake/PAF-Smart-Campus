@@ -9,7 +9,7 @@ import java.util.List;
 public interface BookingService {
     BookingResponse create(BookingCreateRequest request);
     List<BookingResponse> getMyBookings();
-    List<BookingResponse> getAll();
+    List<BookingResponse> getAll(String status, String resourceId, String userId, String dateFrom, String dateTo);
     BookingResponse getById(String id);
     BookingResponse approve(String id, BookingDecisionRequest request);
     BookingResponse reject(String id, BookingDecisionRequest request);

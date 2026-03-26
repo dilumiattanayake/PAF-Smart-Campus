@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -36,8 +37,12 @@ public class BookingController {
     }
 
     @GetMapping
-    public ResponseEntity<List<BookingResponse>> all() {
-        return ResponseEntity.ok(bookingService.getAll());
+    public ResponseEntity<List<BookingResponse>> all(@RequestParam(required = false) String status,
+                                                     @RequestParam(required = false) String resourceId,
+                                                     @RequestParam(required = false) String userId,
+                                                     @RequestParam(required = false) String dateFrom,
+                                                     @RequestParam(required = false) String dateTo) {
+        return ResponseEntity.ok(bookingService.getAll(status, resourceId, userId, dateFrom, dateTo));
     }
 
     @GetMapping("/{id}")

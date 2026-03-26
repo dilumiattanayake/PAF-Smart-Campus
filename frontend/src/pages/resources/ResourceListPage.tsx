@@ -18,8 +18,11 @@ const ResourceListPage = () => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [minCapacity, setMinCapacity] = useState('');
   const [view, setView] = useState<'grid' | 'table'>('grid');
   const [resources, setResources] = useState<Resource[]>([]);
+  const [allResources, setAllResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -27,6 +30,7 @@ const ResourceListPage = () => {
       setLoading(true);
       try {
         const data = await resourceService.getAll();
+        setAllResources(data);
         setResources(data);
       } finally {
         setLoading(false);
@@ -34,20 +38,32 @@ const ResourceListPage = () => {
     })();
   }, []);
 
-  const filtered = resources.filter(r => {
-    if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.location.toLowerCase().includes(search.toLowerCase())) return false;
-    if (typeFilter !== 'all' && r.type !== typeFilter) return false;
-    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
-    return true;
-  });
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await resourceService.getAll({
+          q: search || undefined,
+          type: typeFilter !== 'all' ? typeFilter : undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          location: locationFilter !== 'all' ? locationFilter : undefined,
+          minCapacity: minCapacity ? Number(minCapacity) : undefined,
+        });
+        setResources(data);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [search, typeFilter, statusFilter, locationFilter, minCapacity]);
 
-  const types = [...new Set(resources.map(r => r.type))];
+  const types = [...new Set(allResources.map(r => r.type))];
+  const locations = [...new Set(allResources.map(r => r.location))];
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Resources & Facilities"
-        description={`${resources.length} campus resources available`}
+        description={`${resources.length} resources`}
         actions={user?.role === 'ADMIN' && <Link to="/admin/resources/new"><Button size="sm"><Plus className="h-3 w-3 mr-1" />Add Resource</Button></Link>}
       />
 
@@ -58,9 +74,22 @@ const ResourceListPage = () => {
           searchPlaceholder="Search resources..."
           filters={[
             { key: 'type', label: 'Type', options: types.map(t => ({ label: t, value: t })), value: typeFilter, onChange: setTypeFilter },
-            { key: 'status', label: 'Status', options: [{ label: 'Available', value: 'AVAILABLE' }, { label: 'Occupied', value: 'OCCUPIED' }, { label: 'Maintenance', value: 'MAINTENANCE' }], value: statusFilter, onChange: setStatusFilter },
+            { key: 'location', label: 'Location', options: locations.map(l => ({ label: l, value: l })), value: locationFilter, onChange: setLocationFilter },
+            { key: 'status', label: 'Status', options: [{ label: 'Active', value: 'ACTIVE' }, { label: 'Out of Service', value: 'OUT_OF_SERVICE' }, { label: 'Maintenance', value: 'MAINTENANCE' }], value: statusFilter, onChange: setStatusFilter },
           ]}
         />
+        <div className="flex items-center gap-2">
+          <label htmlFor="minCapacity" className="text-sm text-muted-foreground">Min capacity</label>
+          <input
+            id="minCapacity"
+            type="number"
+            min={1}
+            value={minCapacity}
+            onChange={e => setMinCapacity(e.target.value)}
+            className="h-9 w-24 rounded-md border border-input bg-background px-3 text-sm"
+            placeholder="0"
+          />
+        </div>
         <Tabs value={view} onValueChange={v => setView(v as any)}>
           <TabsList className="h-9">
             <TabsTrigger value="grid" className="px-3"><LayoutGrid className="h-4 w-4" /></TabsTrigger>
@@ -71,11 +100,11 @@ const ResourceListPage = () => {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading resources...</p>
-      ) : filtered.length === 0 ? (
+      ) : resources.length === 0 ? (
         <EmptyState title="No resources found" description="Try adjusting your search or filters." />
       ) : view === 'grid' ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map(r => (
+          {resources.map(r => (
             <Link key={r.id} to={`/resources/${r.id}`}>
               <Card className="hover:shadow-md transition-shadow h-full">
                 <div className="h-32 bg-gradient-to-br from-primary/10 to-accent/10 rounded-t-lg flex items-center justify-center">
@@ -115,7 +144,7 @@ const ResourceListPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(r => (
+                {resources.map(r => (
                   <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell><Link to={`/resources/${r.id}`} className="font-medium hover:text-primary">{r.name}</Link></TableCell>
                     <TableCell>{r.type}</TableCell>

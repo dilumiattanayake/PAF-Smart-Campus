@@ -9,14 +9,28 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { mockNotifications } from '@/data/mockData';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useEffect, useState } from 'react';
+import { notificationService } from '@/services/notificationService';
+import type { Notification } from '@/types';
 
 export const AppTopbar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const unreadCount = mockNotifications.filter(n => !n.isRead).length;
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await notificationService.getAll();
+        setNotifications(data);
+      } catch {
+        // silently ignore for topbar
+      }
+    })();
+  }, []);
 
   const getBreadcrumb = () => {
     const path = location.pathname;
@@ -71,7 +85,7 @@ export const AppTopbar = () => {
               <Link to="/notifications" className="text-xs text-primary hover:underline">View all</Link>
             </div>
             <div className="max-h-72 overflow-y-auto">
-              {mockNotifications.slice(0, 5).map(n => (
+              {notifications.slice(0, 5).map(n => (
                 <div key={n.id} className={`px-4 py-3 border-b last:border-0 ${!n.isRead ? 'bg-primary/5' : ''}`}>
                   <p className="text-sm font-medium">{n.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>

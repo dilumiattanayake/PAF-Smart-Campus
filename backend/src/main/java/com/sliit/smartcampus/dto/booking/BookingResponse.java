@@ -15,7 +15,10 @@ import java.time.LocalTime;
 public class BookingResponse {
     private String id;
     private String resourceId;
+    private String resourceName;
     private String userId;
+    private String requesterName;
+    private String requesterEmail;
     private String purpose;
     private LocalDate bookingDate;
     private LocalTime startTime;

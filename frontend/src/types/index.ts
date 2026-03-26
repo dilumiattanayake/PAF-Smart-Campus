@@ -20,7 +20,7 @@ export interface Resource {
   description: string;
   capacity: number;
   location: string;
-  status: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE' | 'UNAVAILABLE';
+  status: 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' | 'AVAILABLE' | 'UNAVAILABLE';
   availableFrom: string;
   availableTo: string;
   image?: string;
@@ -34,6 +34,7 @@ export interface Booking {
   id: string;
   resourceId: string;
   resourceName: string;
+  userId?: string;
   requesterName: string;
   requesterEmail: string;
   purpose: string;
@@ -81,7 +82,8 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'BOOKING' | 'TICKET' | 'SYSTEM' | 'RESOURCE';
+  type: 'BOOKING_STATUS' | 'TICKET_ASSIGNED' | 'TICKET_STATUS' | 'COMMENT' | 'SYSTEM' | 'RESOURCE' | 'BOOKING' | 'TICKET';
   isRead: boolean;
+  referenceId?: string;
   createdAt: string;
 }

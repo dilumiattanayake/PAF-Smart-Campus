@@ -7,6 +7,7 @@ const mapBooking = (b: any): Booking => ({
   resourceName: b.resourceName || '',
   requesterName: b.requesterName || '',
   requesterEmail: b.requesterEmail || '',
+  userId: b.userId || '',
   purpose: b.purpose,
   bookingDate: b.bookingDate,
   startTime: b.startTime,
@@ -19,8 +20,15 @@ const mapBooking = (b: any): Booking => ({
 });
 
 export const bookingService = {
-  getAll: async (): Promise<Booking[]> => {
-    const { data } = await api.get('/api/bookings');
+  getAll: async (filters?: { status?: string; resourceId?: string; userId?: string; dateFrom?: string; dateTo?: string }): Promise<Booking[]> => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.resourceId) params.set('resourceId', filters.resourceId);
+    if (filters?.userId) params.set('userId', filters.userId);
+    if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+    const query = params.toString();
+    const { data } = await api.get(`/api/bookings${query ? `?${query}` : ''}`);
     return data.map(mapBooking);
   },
   getMyBookings: async (): Promise<Booking[]> => {

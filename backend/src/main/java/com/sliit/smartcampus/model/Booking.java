@@ -35,6 +35,10 @@ public class Booking {
     private BookingStatus status;
     private String rejectionReason;
     private String approvedBy;
+    // denormalized for quick lookup/display
+    private String resourceName;
+    private String requesterName;
+    private String requesterEmail;
 
     @CreatedDate
     private Instant createdAt;

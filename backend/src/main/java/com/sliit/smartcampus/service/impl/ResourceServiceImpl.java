@@ -13,11 +13,13 @@ import com.sliit.smartcampus.repository.ResourceRepository;
 import com.sliit.smartcampus.service.ResourceService;
 import com.sliit.smartcampus.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,17 +62,31 @@ public class ResourceServiceImpl implements ResourceService {
     }
 
     @Override
-    public List<ResourceResponse> getAll(String query, String status) {
-        List<Resource> resources = new ArrayList<>();
-        if (query != null && !query.isBlank()) {
-            resources.addAll(resourceRepository.findByNameContainingIgnoreCaseOrTypeContainingIgnoreCaseOrLocationContainingIgnoreCase(query, query, query));
-        } else if (status != null && !status.isBlank()) {
-            ResourceStatus resStatus = ResourceStatus.valueOf(status.toUpperCase());
-            resources.addAll(resourceRepository.findByStatus(resStatus));
-        } else {
-            resources.addAll(resourceRepository.findAll());
-        }
-        return resources.stream().map(ResourceMapper::toResponse).toList();
+    public List<ResourceResponse> getAll(String query, String status, String type, String location, Integer minCapacity) {
+        List<Resource> resources = new ArrayList<>(resourceRepository.findAll());
+
+        ResourceStatus parsedStatus = resolveStatus(status);
+
+        return resources.stream()
+                .filter(r -> {
+                    if (StringUtils.hasText(query)) {
+                        String q = query.toLowerCase();
+                        return (r.getName() != null && r.getName().toLowerCase().contains(q))
+                                || (r.getType() != null && r.getType().toLowerCase().contains(q))
+                                || (r.getLocation() != null && r.getLocation().toLowerCase().contains(q));
+                    }
+                    return true;
+                })
+                .filter(r -> {
+                    if (parsedStatus == null) return true;
+                    ResourceStatus actual = resolveStatus(r.getStatus() != null ? r.getStatus().name() : null);
+                    return actual == parsedStatus;
+                })
+                .filter(r -> !StringUtils.hasText(type) || (r.getType() != null && r.getType().equalsIgnoreCase(type)))
+                .filter(r -> !StringUtils.hasText(location) || (r.getLocation() != null && r.getLocation().toLowerCase().contains(location.toLowerCase())))
+                .filter(r -> minCapacity == null || (r.getCapacity() != null && r.getCapacity() >= minCapacity))
+                .map(ResourceMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     private void ensureAdmin() {
@@ -78,5 +94,15 @@ public class ResourceServiceImpl implements ResourceService {
         if (role.isEmpty() || role.get() != Role.ADMIN) {
             throw new ForbiddenException("Admin privileges required");
         }
+    }
+
+    private ResourceStatus resolveStatus(String status) {
+        if (!StringUtils.hasText(status)) return null;
+        return switch (status.trim().toUpperCase()) {
+            case "AVAILABLE", "ACTIVE" -> ResourceStatus.ACTIVE;
+            case "UNAVAILABLE", "OUT_OF_SERVICE" -> ResourceStatus.OUT_OF_SERVICE;
+            case "MAINTENANCE" -> ResourceStatus.MAINTENANCE;
+            default -> null;
+        };
     }
 }

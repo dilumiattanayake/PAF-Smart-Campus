@@ -94,9 +94,11 @@ const NewBookingPage = () => {
                   <SelectValue placeholder="Select resource" />
                 </SelectTrigger>
                 <SelectContent>
-                  {resources.filter(r => r.status === 'AVAILABLE').map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.name} ({r.type})</SelectItem>
-                  ))}
+                  {resources
+                    .filter(r => r.status === 'ACTIVE')
+                    .map(r => (
+                      <SelectItem key={r.id} value={r.id}>{r.name} ({r.type})</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <input type="hidden" name="resourceId" value={form.resourceId} />

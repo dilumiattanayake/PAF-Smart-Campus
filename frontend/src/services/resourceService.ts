@@ -8,7 +8,7 @@ const mapResource = (r: any): Resource => ({
   description: r.description,
   capacity: r.capacity,
   location: r.location,
-  status: r.status,
+  status: r.status === 'AVAILABLE' ? 'ACTIVE' : r.status === 'UNAVAILABLE' ? 'OUT_OF_SERVICE' : r.status,
   availableFrom: r.availableFrom || '',
   availableTo: r.availableTo || '',
   image: r.imageUrl,
@@ -17,8 +17,17 @@ const mapResource = (r: any): Resource => ({
 });
 
 export const resourceService = {
-  getAll: async (): Promise<Resource[]> => {
-    const { data } = await api.get('/api/resources');
+  getAll: async (filters?: { q?: string; status?: string; type?: string; location?: string; minCapacity?: number }): Promise<Resource[]> => {
+    const params = new URLSearchParams();
+    if (filters?.q) params.set('q', filters.q);
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.type) params.set('type', filters.type);
+    if (filters?.location) params.set('location', filters.location);
+    if (filters?.minCapacity !== undefined && filters?.minCapacity !== null && !Number.isNaN(filters.minCapacity)) {
+      params.set('minCapacity', String(filters.minCapacity));
+    }
+    const query = params.toString();
+    const { data } = await api.get(`/api/resources${query ? `?${query}` : ''}`);
     return data.map(mapResource);
   },
   getById: async (id: string): Promise<Resource | undefined> => {

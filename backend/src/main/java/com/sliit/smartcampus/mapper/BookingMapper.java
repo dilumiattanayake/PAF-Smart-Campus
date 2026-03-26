@@ -22,6 +22,7 @@ public final class BookingMapper {
                 .build();
     }
 
+    // Note: enrich with names/emails in service layer; this mapper only handles core fields.
     public static BookingResponse toResponse(Booking booking) {
         if (booking == null) return null;
         return BookingResponse.builder()
@@ -37,6 +38,9 @@ public final class BookingMapper {
                 .status(booking.getStatus())
                 .rejectionReason(booking.getRejectionReason())
                 .approvedBy(booking.getApprovedBy())
+                .resourceName(booking.getResourceName())
+                .requesterName(booking.getRequesterName())
+                .requesterEmail(booking.getRequesterEmail())
                 .createdAt(booking.getCreatedAt())
                 .updatedAt(booking.getUpdatedAt())
                 .build();

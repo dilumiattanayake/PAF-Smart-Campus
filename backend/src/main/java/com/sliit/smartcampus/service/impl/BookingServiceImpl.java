@@ -13,15 +13,19 @@ import com.sliit.smartcampus.model.enums.NotificationType;
 import com.sliit.smartcampus.model.enums.Role;
 import com.sliit.smartcampus.repository.BookingRepository;
 import com.sliit.smartcampus.repository.ResourceRepository;
+import com.sliit.smartcampus.repository.UserRepository;
 import com.sliit.smartcampus.service.BookingService;
 import com.sliit.smartcampus.service.NotificationService;
 import com.sliit.smartcampus.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Objects;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +33,7 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final ResourceRepository resourceRepository;
+    private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -38,19 +43,24 @@ public class BookingServiceImpl implements BookingService {
         if (role != Role.USER && role != Role.ADMIN) {
             throw new ForbiddenException("Only users or admins can create bookings");
         }
-        // validate resource exists
-        resourceRepository.findById(request.getResourceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
-
         if (!request.getStartTime().isBefore(request.getEndTime())) {
             throw new ConflictException("Start time must be before end time");
         }
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        var resource = resourceRepository.findById(request.getResourceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new ForbiddenException("User not found"));
+
         Booking booking = BookingMapper.toEntity(request, userId);
+        // denormalize for faster reads & to avoid missing display data
+        booking.setResourceName(resource.getName());
+        booking.setRequesterName(user.getFullName());
+        booking.setRequesterEmail(user.getEmail());
 
         ensureNoConflict(booking, null);
         bookingRepository.save(booking);
-        return BookingMapper.toResponse(booking);
+        return toResponseWithNames(booking);
     }
 
     @Override
@@ -59,20 +69,30 @@ public class BookingServiceImpl implements BookingService {
         Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
         if (role == Role.ADMIN) {
             return bookingRepository.findAll().stream()
-                    .map(BookingMapper::toResponse)
+                    .map(this::toResponseWithNames)
                     .toList();
         }
         return bookingRepository.findByUserId(userId).stream()
-                .map(BookingMapper::toResponse)
+                .map(this::toResponseWithNames)
                 .toList();
     }
 
     @Override
-    public List<BookingResponse> getAll() {
+    public List<BookingResponse> getAll(String status, String resourceId, String userId, String dateFrom, String dateTo) {
         ensureAdmin();
-        return bookingRepository.findAll().stream()
-                .map(BookingMapper::toResponse)
-                .toList();
+        List<Booking> bookings = bookingRepository.findAll();
+        BookingStatus filterStatus = parseStatus(status);
+        LocalDate from = parseDate(dateFrom);
+        LocalDate to = parseDate(dateTo);
+
+        return bookings.stream()
+                .filter(b -> filterStatus == null || b.getStatus() == filterStatus)
+                .filter(b -> resourceId == null || resourceId.isBlank() || Objects.equals(b.getResourceId(), resourceId))
+                .filter(b -> userId == null || userId.isBlank() || Objects.equals(b.getUserId(), userId))
+                .filter(b -> from == null || !b.getBookingDate().isBefore(from))
+                .filter(b -> to == null || !b.getBookingDate().isAfter(to))
+                .map(this::toResponseWithNames)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -84,7 +104,7 @@ public class BookingServiceImpl implements BookingService {
         if (!booking.getUserId().equals(userId) && role != Role.ADMIN) {
             throw new ForbiddenException("Not allowed to view this booking");
         }
-        return BookingMapper.toResponse(booking);
+        return toResponseWithNames(booking);
     }
 
     @Override
@@ -92,6 +112,9 @@ public class BookingServiceImpl implements BookingService {
         ensureAdmin();
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new ConflictException("Only pending bookings can be approved");
+        }
         booking.setStatus(BookingStatus.APPROVED);
         booking.setApprovedBy(SecurityUtils.getCurrentUserId().orElse(null));
         booking.setRejectionReason(null);
@@ -99,7 +122,7 @@ public class BookingServiceImpl implements BookingService {
         bookingRepository.save(booking);
         notificationService.createNotification(booking.getUserId(), "Booking approved",
                 "Your booking has been approved.", NotificationType.BOOKING_STATUS, booking.getId());
-        return BookingMapper.toResponse(booking);
+        return toResponseWithNames(booking);
     }
 
     @Override
@@ -110,13 +133,16 @@ public class BookingServiceImpl implements BookingService {
         }
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new ConflictException("Only pending bookings can be rejected");
+        }
         booking.setStatus(BookingStatus.REJECTED);
         booking.setRejectionReason(request.getRejectionReason());
         booking.setApprovedBy(SecurityUtils.getCurrentUserId().orElse(null));
         bookingRepository.save(booking);
         notificationService.createNotification(booking.getUserId(), "Booking rejected",
                 "Booking rejected: " + request.getRejectionReason(), NotificationType.BOOKING_STATUS, booking.getId());
-        return BookingMapper.toResponse(booking);
+        return toResponseWithNames(booking);
     }
 
     @Override
@@ -135,7 +161,7 @@ public class BookingServiceImpl implements BookingService {
         bookingRepository.save(booking);
         notificationService.createNotification(booking.getUserId(), "Booking cancelled",
                 "Booking cancelled successfully", NotificationType.BOOKING_STATUS, booking.getId());
-        return BookingMapper.toResponse(booking);
+        return toResponseWithNames(booking);
     }
 
     private void ensureNoConflict(Booking booking, String currentBookingId) {
@@ -158,6 +184,35 @@ public class BookingServiceImpl implements BookingService {
 
     private boolean timesOverlap(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
         return start1.isBefore(end2) && end1.isAfter(start2);
+    }
+
+    private BookingStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) return null;
+        try {
+            return BookingStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private BookingResponse toResponseWithNames(Booking booking) {
+        var response = BookingMapper.toResponse(booking);
+        var resource = resourceRepository.findById(booking.getResourceId()).orElse(null);
+        var user = userRepository.findById(booking.getUserId()).orElse(null);
+
+        response.setResourceName(resource != null ? resource.getName() : booking.getResourceName());
+        response.setRequesterName(user != null ? user.getFullName() : booking.getRequesterName());
+        response.setRequesterEmail(user != null ? user.getEmail() : booking.getRequesterEmail());
+        return response;
+    }
+
+    private LocalDate parseDate(String date) {
+        if (date == null || date.isBlank()) return null;
+        try {
+            return LocalDate.parse(date);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void ensureAdmin() {

@@ -29,8 +29,11 @@ public class ResourceController {
 
     @GetMapping
     public ResponseEntity<List<ResourceResponse>> getAll(@RequestParam(required = false) String q,
-                                                         @RequestParam(required = false) String status) {
-        return ResponseEntity.ok(resourceService.getAll(q, status));
+                                                         @RequestParam(required = false) String status,
+                                                         @RequestParam(required = false) String type,
+                                                         @RequestParam(required = false) String location,
+                                                         @RequestParam(required = false) Integer minCapacity) {
+        return ResponseEntity.ok(resourceService.getAll(q, status, type, location, minCapacity));
     }
 
     @GetMapping("/{id}")

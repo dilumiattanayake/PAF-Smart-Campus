@@ -2,13 +2,14 @@ import { cn } from '@/lib/utils';
 import type { BookingStatus, TicketStatus, TicketPriority } from '@/types';
 
 type BadgeType = BookingStatus | TicketStatus | TicketPriority | Resource['status'];
-type Resource = { status: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE' | 'UNAVAILABLE' };
+type Resource = { status: 'ACTIVE' | 'OUT_OF_SERVICE' | 'MAINTENANCE' };
 
 const colorMap: Record<string, string> = {
+  ACTIVE: 'bg-success/15 text-success border-success/30',
   AVAILABLE: 'bg-success/15 text-success border-success/30',
-  OCCUPIED: 'bg-warning/15 text-warning border-warning/30',
-  MAINTENANCE: 'bg-info/15 text-info border-info/30',
+  OUT_OF_SERVICE: 'bg-muted text-muted-foreground border-border',
   UNAVAILABLE: 'bg-muted text-muted-foreground border-border',
+  MAINTENANCE: 'bg-info/15 text-info border-info/30',
   PENDING: 'bg-warning/15 text-warning border-warning/30',
   APPROVED: 'bg-success/15 text-success border-success/30',
   REJECTED: 'bg-destructive/15 text-destructive border-destructive/30',

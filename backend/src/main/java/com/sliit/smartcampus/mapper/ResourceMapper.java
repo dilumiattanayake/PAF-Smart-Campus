@@ -4,6 +4,7 @@ import com.sliit.smartcampus.dto.resource.ResourceCreateRequest;
 import com.sliit.smartcampus.dto.resource.ResourceResponse;
 import com.sliit.smartcampus.dto.resource.ResourceUpdateRequest;
 import com.sliit.smartcampus.model.Resource;
+import com.sliit.smartcampus.model.enums.ResourceStatus;
 
 public final class ResourceMapper {
     private ResourceMapper() {}
@@ -43,12 +44,21 @@ public final class ResourceMapper {
                 .description(resource.getDescription())
                 .capacity(resource.getCapacity())
                 .location(resource.getLocation())
-                .status(resource.getStatus())
+                .status(normalize(resource.getStatus()))
                 .availableFrom(resource.getAvailableFrom())
                 .availableTo(resource.getAvailableTo())
                 .imageUrl(resource.getImageUrl())
                 .createdAt(resource.getCreatedAt())
                 .updatedAt(resource.getUpdatedAt())
                 .build();
+    }
+
+    private static ResourceStatus normalize(ResourceStatus status) {
+        if (status == null) return null;
+        return switch (status) {
+            case AVAILABLE -> ResourceStatus.ACTIVE;
+            case UNAVAILABLE -> ResourceStatus.OUT_OF_SERVICE;
+            default -> status;
+        };
     }
 }

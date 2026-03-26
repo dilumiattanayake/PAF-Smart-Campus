@@ -32,7 +32,7 @@ const AdminResourceFormPage = () => {
   const { id } = useParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', type: '', description: '', capacity: '', location: '', availableFrom: '08:00', availableTo: '18:00', status: 'AVAILABLE' });
+  const [form, setForm] = useState({ name: '', type: '', description: '', capacity: '', location: '', availableFrom: '08:00', availableTo: '18:00', status: 'ACTIVE' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -60,6 +60,7 @@ const AdminResourceFormPage = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = 'Required';
     if (!form.type) e.type = 'Required';
+    if (!form.status) e.status = 'Required';
     if (!form.location.trim()) e.location = 'Required';
     if (!form.capacity || Number(form.capacity) < 1) e.capacity = 'Must be at least 1';
     setErrors(e);
@@ -112,6 +113,17 @@ const AdminResourceFormPage = () => {
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="type" value={form.type} />
+              </FormField>
+              <FormField id="status" label="Status" error={errors.status}>
+                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
+                  <SelectTrigger id="status" aria-label="Status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="OUT_OF_SERVICE">Out of Service</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input type="hidden" name="status" value={form.status} />
               </FormField>
               <FormField id="capacity" label="Capacity" error={errors.capacity}>
                 <Input id="capacity" name="capacity" autoComplete="off" type="number" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />

@@ -11,5 +11,5 @@ public interface ResourceService {
     ResourceResponse update(String id, ResourceUpdateRequest request);
     void delete(String id);
     ResourceResponse getById(String id);
-    List<ResourceResponse> getAll(String query, String status);
+    List<ResourceResponse> getAll(String query, String status, String type, String location, Integer minCapacity);
 }

@@ -1,20 +1,23 @@
 import type { Notification } from '@/types';
-import { mockNotifications } from '@/data/mockData';
-
-const delay = (ms = 500) => new Promise(r => setTimeout(r, ms));
+import { api } from './authService';
 
 export const notificationService = {
   getAll: async (): Promise<Notification[]> => {
-    await delay();
-    return [...mockNotifications];
+    const { data } = await api.get('/api/notifications');
+    return data.map((n: any) => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      type: n.type,
+      isRead: n.read,
+      referenceId: n.referenceId,
+      createdAt: n.createdAt,
+    }));
   },
   markAsRead: async (id: string): Promise<void> => {
-    await delay(200);
-    const n = mockNotifications.find(n => n.id === id);
-    if (n) n.isRead = true;
+    await api.patch(`/api/notifications/${id}/read`);
   },
   markAllAsRead: async (): Promise<void> => {
-    await delay(300);
-    mockNotifications.forEach(n => { n.isRead = true; });
+    await api.patch('/api/notifications/read-all');
   },
 };
