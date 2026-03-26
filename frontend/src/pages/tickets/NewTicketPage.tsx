@@ -10,6 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, Upload } from 'lucide-react';
 
+type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
+
+const FormField = ({ id, label, error, children }: FieldProps) => (
+  <div className="space-y-2">
+    <Label htmlFor={id}>{label}</Label>
+    {children}
+    {error && (
+      <p className="text-xs text-destructive flex items-center gap-1">
+        <AlertCircle className="h-3 w-3" />
+        {error}
+      </p>
+    )}
+  </div>
+);
+
 const NewTicketPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -37,23 +52,17 @@ const NewTicketPage = () => {
     navigate('/tickets');
   };
 
-  const F = ({ id, label, children }: { id: string; label: string; children: React.ReactNode }) => (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {errors[id] && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors[id]}</p>}
-    </div>
-  );
-
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
       <PageHeader title="Report an Issue" description="Submit a new maintenance or incident ticket" />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <F id="title" label="Issue Title"><Input id="title" name="title" autoComplete="off" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief summary of the issue" /></F>
+            <FormField id="title" label="Issue Title" error={errors.title}>
+              <Input id="title" name="title" autoComplete="off" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief summary of the issue" />
+            </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
-              <F id="category" label="Category">
+              <FormField id="category" label="Category" error={errors.category}>
                 <Select value={form.category} onValueChange={v => setForm({ ...form, category: v })}>
                   <SelectTrigger id="category" aria-label="Category"><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
@@ -61,8 +70,8 @@ const NewTicketPage = () => {
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="category" value={form.category} />
-              </F>
-              <F id="priority" label="Priority">
+              </FormField>
+              <FormField id="priority" label="Priority" error={errors.priority}>
                 <Select value={form.priority} onValueChange={v => setForm({ ...form, priority: v })}>
                   <SelectTrigger id="priority" aria-label="Priority"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -70,11 +79,17 @@ const NewTicketPage = () => {
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="priority" value={form.priority} />
-              </F>
+              </FormField>
             </div>
-            <F id="description" label="Description"><Textarea id="description" name="description" autoComplete="off" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Provide details about the issue..." /></F>
-            <F id="resourceOrLocation" label="Resource / Location"><Input id="resourceOrLocation" name="resourceOrLocation" autoComplete="off" value={form.resourceOrLocation} onChange={e => setForm({ ...form, resourceOrLocation: e.target.value })} placeholder="e.g., Building A, Lecture Hall A" /></F>
-            <F id="preferredContact" label="Preferred Contact (optional)"><Input id="preferredContact" name="preferredContact" autoComplete="off" value={form.preferredContact} onChange={e => setForm({ ...form, preferredContact: e.target.value })} placeholder="Email or phone" /></F>
+            <FormField id="description" label="Description" error={errors.description}>
+              <Textarea id="description" name="description" autoComplete="off" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Provide details about the issue..." />
+            </FormField>
+            <FormField id="resourceOrLocation" label="Resource / Location" error={errors.resourceOrLocation}>
+              <Input id="resourceOrLocation" name="resourceOrLocation" autoComplete="off" value={form.resourceOrLocation} onChange={e => setForm({ ...form, resourceOrLocation: e.target.value })} placeholder="e.g., Building A, Lecture Hall A" />
+            </FormField>
+            <FormField id="preferredContact" label="Preferred Contact (optional)" error={errors.preferredContact}>
+              <Input id="preferredContact" name="preferredContact" autoComplete="off" value={form.preferredContact} onChange={e => setForm({ ...form, preferredContact: e.target.value })} placeholder="Email or phone" />
+            </FormField>
 
             {/* File upload UI */}
             <div className="space-y-2">

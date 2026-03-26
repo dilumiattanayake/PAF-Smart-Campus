@@ -15,6 +15,21 @@ import { bookingService } from '@/services/bookingService';
 import type { Resource } from '@/types';
 import { useEffect } from 'react';
 
+type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
+
+const FormField = ({ id, label, error, children }: FieldProps) => (
+  <div className="space-y-2">
+    <Label htmlFor={id}>{label}</Label>
+    {children}
+    {error && (
+      <p className="text-xs text-destructive flex items-center gap-1">
+        <AlertCircle className="h-3 w-3" />
+        {error}
+      </p>
+    )}
+  </div>
+);
+
 const NewBookingPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -67,21 +82,13 @@ const NewBookingPage = () => {
     navigate('/bookings');
   };
 
-  const F = ({ id, label, children }: { id: string; label: string; children: React.ReactNode }) => (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {errors[id] && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors[id]}</p>}
-    </div>
-  );
-
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
       <PageHeader title="Create New Booking" description="Request a campus resource" />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <F id="resourceId" label="Resource">
+            <FormField id="resourceId" label="Resource" error={errors.resourceId}>
               <Select value={form.resourceId} onValueChange={v => setForm({ ...form, resourceId: v })}>
                 <SelectTrigger id="resourceId" aria-label="Resource">
                   <SelectValue placeholder="Select resource" />
@@ -93,15 +100,27 @@ const NewBookingPage = () => {
                 </SelectContent>
               </Select>
               <input type="hidden" name="resourceId" value={form.resourceId} />
-            </F>
-            <F id="purpose" label="Purpose"><Input id="purpose" name="purpose" autoComplete="off" value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} placeholder="e.g., Guest Lecture on AI Ethics" /></F>
+            </FormField>
+            <FormField id="purpose" label="Purpose" error={errors.purpose}>
+              <Input id="purpose" name="purpose" autoComplete="off" value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} placeholder="e.g., Guest Lecture on AI Ethics" />
+            </FormField>
             <div className="grid gap-4 sm:grid-cols-3">
-              <F id="bookingDate" label="Date"><Input id="bookingDate" name="bookingDate" autoComplete="off" type="date" value={form.bookingDate} onChange={e => setForm({ ...form, bookingDate: e.target.value })} /></F>
-              <F id="startTime" label="Start Time"><Input id="startTime" name="startTime" autoComplete="off" type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></F>
-              <F id="endTime" label="End Time"><Input id="endTime" name="endTime" autoComplete="off" type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></F>
+              <FormField id="bookingDate" label="Date" error={errors.bookingDate}>
+                <Input id="bookingDate" name="bookingDate" autoComplete="off" type="date" value={form.bookingDate} onChange={e => setForm({ ...form, bookingDate: e.target.value })} />
+              </FormField>
+              <FormField id="startTime" label="Start Time" error={errors.startTime}>
+                <Input id="startTime" name="startTime" autoComplete="off" type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} />
+              </FormField>
+              <FormField id="endTime" label="End Time" error={errors.endTime}>
+                <Input id="endTime" name="endTime" autoComplete="off" type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} />
+              </FormField>
             </div>
-            <F id="attendeeCount" label="Number of Attendees"><Input id="attendeeCount" name="attendeeCount" autoComplete="off" type="number" value={form.attendeeCount} onChange={e => setForm({ ...form, attendeeCount: e.target.value })} /></F>
-            <F id="notes" label="Additional Notes (optional)"><Textarea id="notes" name="notes" autoComplete="off" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} /></F>
+            <FormField id="attendeeCount" label="Number of Attendees" error={errors.attendeeCount}>
+              <Input id="attendeeCount" name="attendeeCount" autoComplete="off" type="number" value={form.attendeeCount} onChange={e => setForm({ ...form, attendeeCount: e.target.value })} />
+            </FormField>
+            <FormField id="notes" label="Additional Notes (optional)" error={errors.notes}>
+              <Textarea id="notes" name="notes" autoComplete="off" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} />
+            </FormField>
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={loading}>{loading ? 'Submitting...' : 'Submit Booking'}</Button>
               <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>

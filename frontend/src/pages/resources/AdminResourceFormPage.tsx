@@ -12,6 +12,21 @@ import { AlertCircle } from 'lucide-react';
 import { resourceService } from '@/services/resourceService';
 import type { Resource } from '@/types';
 
+type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
+
+const FormField = ({ id, label, error, children }: FieldProps) => (
+  <div className="space-y-2">
+    <Label htmlFor={id}>{label}</Label>
+    {children}
+    {error && (
+      <p className="text-xs text-destructive flex items-center gap-1">
+        <AlertCircle className="h-3 w-3" />
+        {error}
+      </p>
+    )}
+  </div>
+);
+
 const AdminResourceFormPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -79,23 +94,17 @@ const AdminResourceFormPage = () => {
     navigate('/resources');
   };
 
-  const F = ({ id, label, children }: { id: string; label: string; children: React.ReactNode }) => (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {errors[id] && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors[id]}</p>}
-    </div>
-  );
-
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
       <PageHeader title="Add New Resource" description="Create a new campus resource or facility" />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <F id="name" label="Resource Name"><Input id="name" name="name" autoComplete="off" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></F>
+            <FormField id="name" label="Resource Name" error={errors.name}>
+              <Input id="name" name="name" autoComplete="off" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
-              <F id="type" label="Type">
+              <FormField id="type" label="Type" error={errors.type}>
                 <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
                   <SelectTrigger id="type" aria-label="Type"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
@@ -103,14 +112,24 @@ const AdminResourceFormPage = () => {
                   </SelectContent>
                 </Select>
                 <input type="hidden" name="type" value={form.type} />
-              </F>
-              <F id="capacity" label="Capacity"><Input id="capacity" name="capacity" autoComplete="off" type="number" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} /></F>
+              </FormField>
+              <FormField id="capacity" label="Capacity" error={errors.capacity}>
+                <Input id="capacity" name="capacity" autoComplete="off" type="number" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
+              </FormField>
             </div>
-            <F id="location" label="Location"><Input id="location" name="location" autoComplete="off" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></F>
-            <F id="description" label="Description"><Textarea id="description" name="description" autoComplete="off" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} /></F>
+            <FormField id="location" label="Location" error={errors.location}>
+              <Input id="location" name="location" autoComplete="off" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+            </FormField>
+            <FormField id="description" label="Description" error={errors.description}>
+              <Textarea id="description" name="description" autoComplete="off" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} />
+            </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
-              <F id="availableFrom" label="Available From"><Input id="availableFrom" name="availableFrom" autoComplete="off" type="time" value={form.availableFrom} onChange={e => setForm({ ...form, availableFrom: e.target.value })} /></F>
-              <F id="availableTo" label="Available To"><Input id="availableTo" name="availableTo" autoComplete="off" type="time" value={form.availableTo} onChange={e => setForm({ ...form, availableTo: e.target.value })} /></F>
+              <FormField id="availableFrom" label="Available From" error={errors.availableFrom}>
+                <Input id="availableFrom" name="availableFrom" autoComplete="off" type="time" value={form.availableFrom} onChange={e => setForm({ ...form, availableFrom: e.target.value })} />
+              </FormField>
+              <FormField id="availableTo" label="Available To" error={errors.availableTo}>
+                <Input id="availableTo" name="availableTo" autoComplete="off" type="time" value={form.availableTo} onChange={e => setForm({ ...form, availableTo: e.target.value })} />
+              </FormField>
             </div>
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Resource'}</Button>
