@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { User } from '@/types';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090';
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9199';
 
 export const api = axios.create({
   baseURL,
