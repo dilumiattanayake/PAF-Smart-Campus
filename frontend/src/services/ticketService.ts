@@ -59,12 +59,20 @@ export const ticketService = {
     const { data } = await api.get<TicketApiResponse[]>('/api/tickets/my');
     return data.map(mapTicket);
   },
+  getAssignedTickets: async (): Promise<Ticket[]> => {
+    const { data } = await api.get<TicketApiResponse[]>('/api/tickets/assigned');
+    return data.map(mapTicket);
+  },
   create: async (data: TicketCreatePayload): Promise<Ticket> => {
     const { data: created } = await api.post<TicketApiResponse>('/api/tickets', data);
     return mapTicket(created);
   },
-  updateStatus: async (id: string, status: Ticket['status']): Promise<Ticket> => {
-    const { data } = await api.patch<TicketApiResponse>(`/api/tickets/${id}/status`, { status });
+  updateStatus: async (id: string, status: Ticket['status'], resolutionNotes?: string): Promise<Ticket> => {
+    const { data } = await api.patch<TicketApiResponse>(`/api/tickets/${id}/status`, { status, resolutionNotes });
+    return mapTicket(data);
+  },
+  updateResolution: async (id: string, resolutionNotes: string): Promise<Ticket> => {
+    const { data } = await api.patch<TicketApiResponse>(`/api/tickets/${id}/resolution`, { resolutionNotes });
     return mapTicket(data);
   },
   assignTechnician: async (id: string, technicianId: string): Promise<Ticket> => {

@@ -34,7 +34,7 @@ const adminNav: NavItem[] = [
 const techNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'My Tasks', href: '/technician/tasks', icon: Wrench },
-  { label: 'Tickets', href: '/tickets', icon: ClipboardList },
+  { label: 'Tickets', href: '/technician/tickets', icon: ClipboardList },
   { label: 'Notifications', href: '/notifications', icon: Bell },
 ];
 

@@ -80,7 +80,7 @@ const TicketDetailPage = () => {
   const handleStatusUpdate = async () => {
     if (!ticket) return;
     try {
-      await ticketService.updateStatus(ticket.id, newStatus as Ticket['status']);
+      await ticketService.updateStatus(ticket.id, newStatus as Ticket['status'], resolutionNotes.trim() || undefined);
       const updatedTicket = await ticketService.getById(ticket.id);
       setTicket(updatedTicket || null);
       setNewStatus(updatedTicket?.status || 'OPEN');
@@ -214,14 +214,14 @@ const TicketDetailPage = () => {
             <Card>
               <CardHeader className="pb-3"><CardTitle className="text-base">Update Status</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <Select defaultValue={ticket.status}>
+                <Select value={newStatus} onValueChange={handleStatusChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Textarea placeholder="Resolution notes..." rows={2} />
-                <Button size="sm" className="w-full">Update Status</Button>
+                <Textarea placeholder="Resolution notes..." value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} rows={2} />
+                <Button size="sm" className="w-full" onClick={handleStatusUpdate}>Update Status</Button>
               </CardContent>
             </Card>
           )}

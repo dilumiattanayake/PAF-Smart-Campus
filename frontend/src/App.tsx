@@ -16,6 +16,7 @@ import BookingListPage from "@/pages/bookings/BookingListPage";
 import BookingDetailPage from "@/pages/bookings/BookingDetailPage";
 import NewBookingPage from "@/pages/bookings/NewBookingPage";
 import TicketListPage from "@/pages/tickets/TicketListPage";
+import TechnicianTicketsPage from "./pages/technician/TechnicianTicketsPage";
 import TicketDetailPage from "@/pages/tickets/TicketDetailPage";
 import NewTicketPage from "@/pages/tickets/NewTicketPage";
 import NotificationsPage from "@/pages/NotificationsPage";
@@ -65,6 +66,7 @@ const AppRoutes = () => (
       <Route path="/admin/bookings" element={<AdminBookingsPage />} />
       <Route path="/admin/tickets" element={<AdminTicketsPage />} />
       <Route path="/technician/tasks" element={<TechnicianTasksPage />} />
+      <Route path="/technician/tickets" element={<TechnicianTicketsPage />} />
     </Route>
 
     <Route path="*" element={<NotFound />} />

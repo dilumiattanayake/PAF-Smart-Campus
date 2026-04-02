@@ -51,16 +51,20 @@ public class TicketServiceImpl implements TicketService {
     @Override
     public List<TicketResponse> getMyTickets() {
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
-        Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
-        List<Ticket> tickets;
-        if (role == Role.ADMIN) {
-            tickets = ticketRepository.findAll();
-        } else if (role == Role.TECHNICIAN) {
-            tickets = ticketRepository.findByAssignedTechnicianId(userId);
-        } else {
-            tickets = ticketRepository.findByCreatedByUserId(userId);
+        return ticketRepository.findByCreatedByUserId(userId).stream()
+            .map(ticket -> TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId())))
+                .toList();
+    }
+
+    @Override
+    public List<TicketResponse> getAssignedTickets() {
+        Role role = SecurityUtils.getCurrentUserRole()
+                .orElseThrow(() -> new ForbiddenException("Not authenticated"));
+        if (role != Role.TECHNICIAN) {
+            throw new ForbiddenException("Technician privileges required");
         }
-        return tickets.stream()
+        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        return ticketRepository.findByAssignedTechnicianId(userId).stream()
             .map(ticket -> TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId())))
                 .toList();
     }
@@ -100,7 +104,7 @@ public class TicketServiceImpl implements TicketService {
     }
 
     @Override
-    public TicketResponse updateStatus(String id, TicketStatus status) {
+    public TicketResponse updateStatus(String id, TicketStatus status, String resolutionNotes) {
         Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
@@ -112,6 +116,9 @@ public class TicketServiceImpl implements TicketService {
             throw new ForbiddenException("Not allowed to update status");
         }
         ticket.setStatus(status);
+        if (resolutionNotes != null && !resolutionNotes.isBlank()) {
+            ticket.setResolutionNotes(resolutionNotes.trim());
+        }
         ticketRepository.save(ticket);
         notificationService.createNotification(ticket.getCreatedByUserId(), "Ticket status updated",
                 "Ticket status changed to " + status.name(), NotificationType.TICKET_STATUS, ticket.getId());
@@ -120,25 +127,15 @@ public class TicketServiceImpl implements TicketService {
 
     @Override
     public TicketResponse updateResolution(String id, String notes) {
-        Ticket ticket = ticketRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
-        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
-        Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
-        if (role == Role.TECHNICIAN && !userId.equals(ticket.getAssignedTechnicianId())) {
-            throw new ForbiddenException("Technician can only update assigned tickets");
-        }
-        if (role != Role.ADMIN && role != Role.TECHNICIAN) {
-            throw new ForbiddenException("Not allowed to update resolution");
-        }
         if (notes == null || notes.isBlank()) {
             throw new BadRequestException("Resolution notes required");
         }
-        ticket.setResolutionNotes(notes);
-        ticket.setStatus(TicketStatus.RESOLVED);
-        ticketRepository.save(ticket);
+        TicketResponse response = updateStatus(id, TicketStatus.RESOLVED, notes);
+        Ticket ticket = ticketRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
         notificationService.createNotification(ticket.getCreatedByUserId(), "Ticket resolved",
                 "Ticket has been resolved", NotificationType.TICKET_STATUS, ticket.getId());
-        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId()));
+        return response;
     }
 
     private String resolveUserName(String userId) {

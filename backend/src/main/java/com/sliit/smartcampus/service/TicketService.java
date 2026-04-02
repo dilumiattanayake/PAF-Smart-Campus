@@ -10,9 +10,10 @@ import java.util.List;
 public interface TicketService {
     TicketResponse create(TicketCreateRequest request);
     List<TicketResponse> getMyTickets();
+    List<TicketResponse> getAssignedTickets();
     List<TicketResponse> getAll();
     TicketResponse getById(String id);
     TicketResponse assign(String id, String technicianId);
-    TicketResponse updateStatus(String id, TicketStatus status);
+    TicketResponse updateStatus(String id, TicketStatus status, String resolutionNotes);
     TicketResponse updateResolution(String id, String notes);
 }

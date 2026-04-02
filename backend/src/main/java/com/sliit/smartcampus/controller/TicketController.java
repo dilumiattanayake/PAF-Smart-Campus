@@ -37,6 +37,11 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.getMyTickets());
     }
 
+    @GetMapping("/assigned")
+    public ResponseEntity<List<TicketResponse>> assignedTickets() {
+        return ResponseEntity.ok(ticketService.getAssignedTickets());
+    }
+
     @GetMapping
     public ResponseEntity<List<TicketResponse>> all() {
         return ResponseEntity.ok(ticketService.getAll());
@@ -57,7 +62,7 @@ public class TicketController {
         if (request.getStatus() == null) {
             throw new BadRequestException("Status is required");
         }
-        return ResponseEntity.ok(ticketService.updateStatus(id, request.getStatus()));
+        return ResponseEntity.ok(ticketService.updateStatus(id, request.getStatus(), request.getResolutionNotes()));
     }
 
     @PatchMapping("/{id}/resolution")
