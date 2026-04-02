@@ -8,35 +8,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { ticketService } from '@/services/ticketService';
-import type { Ticket } from '@/types';
-
-const techs = [
-  { id: 'tech-1', name: 'Technician 1' },
-  { id: 'tech-2', name: 'Technician 2' },
-  { id: 'tech-3', name: 'Technician 3' },
-];
+import { userService } from '@/services/userService';
+import type { Ticket, User } from '@/types';
 
 const AdminTicketsPage = () => {
   const { toast } = useToast();
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [techs, setTechs] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadTickets = async () => {
+    const data = await ticketService.getAll();
+    setTickets(data);
+  };
 
   useEffect(() => {
     let active = true;
 
-    const loadTickets = async () => {
+    const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await ticketService.getAll();
+        const [ticketData, technicianData] = await Promise.all([
+          ticketService.getAll(),
+          userService.getTechnicians(),
+        ]);
         if (active) {
-          setTickets(data);
+          setTickets(ticketData);
+          setTechs(technicianData);
         }
       } catch {
         if (active) {
-          setError('Failed to load tickets. Please try again.');
+          setError('Failed to load tickets or technicians. Please try again.');
           setTickets([]);
+          setTechs([]);
         }
       } finally {
         if (active) {
@@ -45,12 +51,22 @@ const AdminTicketsPage = () => {
       }
     };
 
-    loadTickets();
+    loadData();
 
     return () => {
       active = false;
     };
   }, []);
+
+  const handleAssign = async (ticketId: string, technicianId: string) => {
+    try {
+      await ticketService.assignTechnician(ticketId, technicianId);
+      await loadTickets();
+      toast({ title: 'Technician assigned' });
+    } catch {
+      toast({ title: 'Failed to assign technician' });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -81,9 +97,9 @@ const AdminTicketsPage = () => {
                     <TableCell><StatusBadge status={t.priority} /></TableCell>
                     <TableCell><StatusBadge status={t.status} /></TableCell>
                     <TableCell>
-                      <Select defaultValue={t.assignedTechnician || ''} onValueChange={() => toast({ title: 'Technician assigned' })}>
+                      <Select value={t.assignedTechnician || ''} onValueChange={(technicianId) => handleAssign(t.id, technicianId)}>
                         <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="Assign..." /></SelectTrigger>
-                        <SelectContent>{techs.map(tc => <SelectItem key={tc.id} value={tc.name}>{tc.name}</SelectItem>)}</SelectContent>
+                        <SelectContent>{techs.map(tc => <SelectItem key={tc.id} value={tc.id}>{tc.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell><Link to={`/tickets/${t.id}`}><Button size="sm" variant="ghost" className="h-7 text-xs">View</Button></Link></TableCell>
