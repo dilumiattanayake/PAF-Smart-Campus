@@ -7,7 +7,6 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ticketService } from '@/services/ticketService';
@@ -18,7 +17,6 @@ const TicketListPage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [tab, setTab] = useState('all');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,9 +28,7 @@ const TicketListPage = () => {
       setLoading(true);
       setError(null);
       try {
-        const data = tab === 'mine'
-          ? await ticketService.getMyTickets(user?.name || '')
-          : await ticketService.getAll();
+        const data = await ticketService.getMyTickets(user?.name || '');
         if (active) {
           setTickets(data);
         }
@@ -53,7 +49,7 @@ const TicketListPage = () => {
     return () => {
       active = false;
     };
-  }, [tab, user?.name]);
+  }, [user?.name]);
 
   const filtered = tickets.filter(t => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()) && !t.id.toLowerCase().includes(search.toLowerCase())) return false;
@@ -69,13 +65,6 @@ const TicketListPage = () => {
         description="Report and track campus issues"
         actions={<Link to="/tickets/new"><Button size="sm"><Plus className="h-3 w-3 mr-1" />New Ticket</Button></Link>}
       />
-
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="all">All Tickets</TabsTrigger>
-          <TabsTrigger value="mine">My Tickets</TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       <SearchFilterBar
         searchValue={search}
