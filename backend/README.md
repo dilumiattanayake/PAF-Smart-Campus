@@ -44,4 +44,8 @@ Backend for managing campus resources, bookings, maintenance tickets, comments, 
 ## Troubleshooting Port In Use
 - Error: `Port 9199 was already in use`
 - Cause: another backend process is already running.
-- Fix: use `./run-backend.ps1` instead of running `./mvnw spring-boot:run` repeatedly.
+- Fix (recommended): use `./run-backend.ps1` instead of running `./mvnw spring-boot:run` repeatedly.
+- Manual fix (PowerShell): `Get-NetTCPConnection -LocalPort 9199 | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }`
+- Alternative: run backend on another port for this terminal only:
+	- PowerShell: `$env:SERVER_PORT=9200; ./mvnw spring-boot:run`
+	- Frontend base URL should match that port.
