@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchFilterBar } from '@/components/shared/SearchFilterBar';
@@ -8,9 +8,10 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockTickets } from '@/data/mockData';
 import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { ticketService } from '@/services/ticketService';
+import type { Ticket } from '@/types';
 
 const TicketListPage = () => {
   const { user } = useAuth();
@@ -18,10 +19,41 @@ const TicketListPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [tab, setTab] = useState('all');
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const tickets = tab === 'mine'
-    ? mockTickets.filter(t => t.createdBy === user?.name)
-    : mockTickets;
+  useEffect(() => {
+    let active = true;
+
+    const loadTickets = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = tab === 'mine'
+          ? await ticketService.getMyTickets(user?.name || '')
+          : await ticketService.getAll();
+        if (active) {
+          setTickets(data);
+        }
+      } catch {
+        if (active) {
+          setError('Failed to load tickets. Please try again.');
+          setTickets([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadTickets();
+
+    return () => {
+      active = false;
+    };
+  }, [tab, user?.name]);
 
   const filtered = tickets.filter(t => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()) && !t.id.toLowerCase().includes(search.toLowerCase())) return false;
@@ -55,7 +87,15 @@ const TicketListPage = () => {
         ]}
       />
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <Card>
+          <div className="p-6 text-sm text-muted-foreground">Loading tickets...</div>
+        </Card>
+      ) : error ? (
+        <Card>
+          <div className="p-6 text-sm text-destructive">{error}</div>
+        </Card>
+      ) : filtered.length === 0 ? (
         <EmptyState title="No tickets found" action={<Link to="/tickets/new"><Button><Plus className="h-4 w-4 mr-1" />Create Ticket</Button></Link>} />
       ) : (
         <Card>
