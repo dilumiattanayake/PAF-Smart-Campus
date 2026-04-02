@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, Upload } from 'lucide-react';
+import { ticketService } from '@/services/ticketService';
 
 type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
 
@@ -46,10 +47,23 @@ const NewTicketPage = () => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    setLoading(false);
-    toast({ title: 'Ticket created', description: 'Your maintenance request has been submitted.' });
-    navigate('/tickets');
+    try {
+      await ticketService.create({
+        title: form.title,
+        category: form.category,
+        description: form.description,
+        priority: form.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+        resourceOrLocation: form.resourceOrLocation,
+        preferredContact: form.preferredContact,
+        attachmentUrls: [],
+      });
+      toast({ title: 'Ticket created', description: 'Your maintenance request has been submitted.' });
+      navigate('/tickets');
+    } catch {
+      toast({ title: 'Failed to create ticket', description: 'Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -1,36 +1,73 @@
 import type { Ticket } from '@/types';
-import { mockTickets } from '@/data/mockData';
+import { api } from './authService';
 
-const delay = (ms = 500) => new Promise(r => setTimeout(r, ms));
+type TicketApiResponse = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  priority: Ticket['priority'];
+  resourceOrLocation: string;
+  preferredContact?: string;
+  attachmentUrls?: string[];
+  createdByUserId?: string;
+  assignedTechnicianId?: string;
+  status: Ticket['status'];
+  resolutionNotes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TicketCreatePayload = {
+  title: string;
+  category: string;
+  description: string;
+  priority: Ticket['priority'];
+  resourceOrLocation: string;
+  preferredContact?: string;
+  attachmentUrls?: string[];
+};
+
+const mapTicket = (t: TicketApiResponse): Ticket => ({
+  id: t.id,
+  title: t.title,
+  category: t.category,
+  description: t.description,
+  priority: t.priority,
+  resourceOrLocation: t.resourceOrLocation,
+  preferredContact: t.preferredContact || '',
+  attachments: t.attachmentUrls || [],
+  createdBy: t.createdByUserId || '',
+  assignedTechnician: t.assignedTechnicianId,
+  status: t.status,
+  resolutionNotes: t.resolutionNotes,
+  createdAt: t.createdAt || new Date().toISOString(),
+  updatedAt: t.updatedAt || new Date().toISOString(),
+});
 
 export const ticketService = {
   getAll: async (): Promise<Ticket[]> => {
-    await delay();
-    return [...mockTickets];
+    const { data } = await api.get<TicketApiResponse[]>('/api/tickets');
+    return data.map(mapTicket);
   },
   getById: async (id: string): Promise<Ticket | undefined> => {
-    await delay(300);
-    return mockTickets.find(t => t.id === id);
+    const { data } = await api.get<TicketApiResponse>(`/api/tickets/${id}`);
+    return mapTicket(data);
   },
-  getMyTickets: async (createdBy: string): Promise<Ticket[]> => {
-    await delay();
-    return mockTickets.filter(t => t.createdBy === createdBy);
+  getMyTickets: async (_createdBy?: string): Promise<Ticket[]> => {
+    const { data } = await api.get<TicketApiResponse[]>('/api/tickets/my');
+    return data.map(mapTicket);
   },
-  create: async (data: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt'>): Promise<Ticket> => {
-    await delay(600);
-    const now = new Date().toISOString();
-    return { ...data, id: `T${Date.now()}`, status: 'OPEN', createdAt: now, updatedAt: now };
+  create: async (data: TicketCreatePayload): Promise<Ticket> => {
+    const { data: created } = await api.post<TicketApiResponse>('/api/tickets', data);
+    return mapTicket(created);
   },
-  updateStatus: async (id: string, status: Ticket['status'], notes?: string): Promise<Ticket> => {
-    await delay(400);
-    const t = mockTickets.find(t => t.id === id);
-    if (!t) throw new Error('Ticket not found');
-    return { ...t, status, resolutionNotes: notes || t.resolutionNotes, updatedAt: new Date().toISOString() };
+  updateStatus: async (id: string, status: Ticket['status']): Promise<Ticket> => {
+    const { data } = await api.patch<TicketApiResponse>(`/api/tickets/${id}/status`, { status });
+    return mapTicket(data);
   },
-  assignTechnician: async (id: string, techName: string): Promise<Ticket> => {
-    await delay(400);
-    const t = mockTickets.find(t => t.id === id);
-    if (!t) throw new Error('Ticket not found');
-    return { ...t, assignedTechnician: techName, updatedAt: new Date().toISOString() };
+  assignTechnician: async (id: string, technicianId: string): Promise<Ticket> => {
+    const { data } = await api.patch<TicketApiResponse>(`/api/tickets/${id}/assign/${technicianId}`);
+    return mapTicket(data);
   },
 };
