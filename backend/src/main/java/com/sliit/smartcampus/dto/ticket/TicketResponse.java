@@ -23,6 +23,7 @@ public class TicketResponse {
     private String preferredContact;
     private List<String> attachmentUrls;
     private String createdByUserId;
+    private String createdByUserName;
     private String assignedTechnicianId;
     private TicketStatus status;
     private String resolutionNotes;

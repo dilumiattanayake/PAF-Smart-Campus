@@ -26,6 +26,10 @@ public final class TicketMapper {
     }
 
     public static TicketResponse toResponse(Ticket ticket, List<CommentResponse> comments) {
+        return toResponse(ticket, comments, null);
+    }
+
+    public static TicketResponse toResponse(Ticket ticket, List<CommentResponse> comments, String createdByUserName) {
         if (ticket == null) return null;
         return TicketResponse.builder()
                 .id(ticket.getId())
@@ -37,6 +41,7 @@ public final class TicketMapper {
                 .preferredContact(ticket.getPreferredContact())
                 .attachmentUrls(ticket.getAttachmentUrls())
                 .createdByUserId(ticket.getCreatedByUserId())
+                .createdByUserName(createdByUserName)
                 .assignedTechnicianId(ticket.getAssignedTechnicianId())
                 .status(ticket.getStatus())
                 .resolutionNotes(ticket.getResolutionNotes())

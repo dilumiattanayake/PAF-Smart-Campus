@@ -11,6 +11,7 @@ type TicketApiResponse = {
   preferredContact?: string;
   attachmentUrls?: string[];
   createdByUserId?: string;
+  createdByUserName?: string;
   assignedTechnicianId?: string;
   status: Ticket['status'];
   resolutionNotes?: string;
@@ -37,7 +38,7 @@ const mapTicket = (t: TicketApiResponse): Ticket => ({
   resourceOrLocation: t.resourceOrLocation,
   preferredContact: t.preferredContact || '',
   attachments: t.attachmentUrls || [],
-  createdBy: t.createdByUserId || '',
+  createdBy: t.createdByUserName || t.createdByUserId || '',
   assignedTechnician: t.assignedTechnicianId,
   status: t.status,
   resolutionNotes: t.resolutionNotes,

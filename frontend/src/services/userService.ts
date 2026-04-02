@@ -20,6 +20,10 @@ const mapUser = (u: UserApiResponse): User => ({
 });
 
 export const userService = {
+  getById: async (id: string): Promise<User> => {
+    const { data } = await api.get<UserApiResponse>(`/api/users/${id}`);
+    return mapUser(data);
+  },
   getTechnicians: async (): Promise<User[]> => {
     const { data } = await api.get<UserApiResponse[]>('/api/users/technicians');
     return data.map(mapUser);

@@ -11,11 +11,13 @@ import com.sliit.smartcampus.mapper.CommentMapper;
 import com.sliit.smartcampus.mapper.TicketMapper;
 import com.sliit.smartcampus.model.Comment;
 import com.sliit.smartcampus.model.Ticket;
+import com.sliit.smartcampus.model.User;
 import com.sliit.smartcampus.model.enums.NotificationType;
 import com.sliit.smartcampus.model.enums.Role;
 import com.sliit.smartcampus.model.enums.TicketStatus;
 import com.sliit.smartcampus.repository.CommentRepository;
 import com.sliit.smartcampus.repository.TicketRepository;
+import com.sliit.smartcampus.repository.UserRepository;
 import com.sliit.smartcampus.service.NotificationService;
 import com.sliit.smartcampus.service.TicketService;
 import com.sliit.smartcampus.util.SecurityUtils;
@@ -30,6 +32,7 @@ public class TicketServiceImpl implements TicketService {
 
     private final TicketRepository ticketRepository;
     private final CommentRepository commentRepository;
+    private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -42,7 +45,7 @@ public class TicketServiceImpl implements TicketService {
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
         Ticket ticket = TicketMapper.toEntity(request, userId);
         ticketRepository.save(ticket);
-        return TicketMapper.toResponse(ticket, List.of());
+        return TicketMapper.toResponse(ticket, List.of(), resolveUserName(ticket.getCreatedByUserId()));
     }
 
     @Override
@@ -58,7 +61,7 @@ public class TicketServiceImpl implements TicketService {
             tickets = ticketRepository.findByCreatedByUserId(userId);
         }
         return tickets.stream()
-                .map(ticket -> TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId())))
+            .map(ticket -> TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId())))
                 .toList();
     }
 
@@ -66,7 +69,7 @@ public class TicketServiceImpl implements TicketService {
     public List<TicketResponse> getAll() {
         ensureAdmin();
         return ticketRepository.findAll().stream()
-                .map(ticket -> TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId())))
+            .map(ticket -> TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId())))
                 .toList();
     }
 
@@ -80,7 +83,7 @@ public class TicketServiceImpl implements TicketService {
                 && !(role == Role.TECHNICIAN && userId.equals(ticket.getAssignedTechnicianId()))) {
             throw new ForbiddenException("Not allowed to view this ticket");
         }
-        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()));
+        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId()));
     }
 
     @Override
@@ -93,7 +96,7 @@ public class TicketServiceImpl implements TicketService {
         ticketRepository.save(ticket);
         notificationService.createNotification(technicianId, "Ticket assigned",
                 "A ticket has been assigned to you", NotificationType.TICKET_ASSIGNED, ticket.getId());
-        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()));
+        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId()));
     }
 
     @Override
@@ -112,7 +115,7 @@ public class TicketServiceImpl implements TicketService {
         ticketRepository.save(ticket);
         notificationService.createNotification(ticket.getCreatedByUserId(), "Ticket status updated",
                 "Ticket status changed to " + status.name(), NotificationType.TICKET_STATUS, ticket.getId());
-        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()));
+        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId()));
     }
 
     @Override
@@ -135,7 +138,13 @@ public class TicketServiceImpl implements TicketService {
         ticketRepository.save(ticket);
         notificationService.createNotification(ticket.getCreatedByUserId(), "Ticket resolved",
                 "Ticket has been resolved", NotificationType.TICKET_STATUS, ticket.getId());
-        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()));
+        return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId()));
+    }
+
+    private String resolveUserName(String userId) {
+        return userRepository.findById(userId)
+                .map(User::getFullName)
+                .orElse(userId);
     }
 
     private List<CommentResponse> getCommentsForTicket(String ticketId) {

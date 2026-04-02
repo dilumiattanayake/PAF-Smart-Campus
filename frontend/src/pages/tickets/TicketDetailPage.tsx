@@ -1,5 +1,4 @@
 import { useParams, Link } from 'react-router-dom';
-import { mockTickets, mockUsers } from '@/data/mockData';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,20 +6,95 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, MapPin, User, Clock, MessageSquare, Upload } from 'lucide-react';
+import { ArrowLeft, MapPin, User, Clock, MessageSquare } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { LoadingState } from '@/components/shared/LoadingState';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ticketService } from '@/services/ticketService';
+import { userService } from '@/services/userService';
+import type { Ticket, User as UserType } from '@/types';
 
 const TicketDetailPage = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const ticket = mockTickets.find(t => t.id === id);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [techs, setTechs] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
+  const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN');
+  const [resolutionNotes, setResolutionNotes] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        if (id) {
+          const [ticketData, technicianData] = await Promise.all([
+            ticketService.getById(id),
+            userService.getTechnicians(),
+          ]);
+          if (active) {
+            setTicket(ticketData || null);
+            setTechs(technicianData);
+          }
+        }
+      } catch {
+        if (active) {
+          setTicket(null);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const handleAssign = async (technicianId: string) => {
+    if (!ticket) return;
+    try {
+      await ticketService.assignTechnician(ticket.id, technicianId);
+      const updatedTicket = await ticketService.getById(ticket.id);
+      setTicket(updatedTicket || null);
+    } catch {
+      console.error('Failed to assign technician');
+    }
+  };
+
+  // Keep admin status dropdown aligned with current ticket status.
+  useEffect(() => {
+    if (ticket) {
+      setNewStatus(ticket.status);
+    }
+  }, [ticket]);
+
+  const handleStatusUpdate = async () => {
+    if (!ticket) return;
+    try {
+      await ticketService.updateStatus(ticket.id, newStatus as Ticket['status']);
+      const updatedTicket = await ticketService.getById(ticket.id);
+      setTicket(updatedTicket || null);
+      setNewStatus(updatedTicket?.status || 'OPEN');
+      setResolutionNotes('');
+    } catch {
+      console.error('Failed to update status');
+    }
+  };
+
+  if (loading) return <LoadingState />;
 
   if (!ticket) return <EmptyState title="Ticket not found" action={<Link to="/tickets"><Button variant="outline"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button></Link>} />;
 
-  const technicians = mockUsers.filter(u => u.role === 'TECHNICIAN');
+  const technicians = techs;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -79,10 +153,7 @@ const TicketDetailPage = () => {
                   onChange={e => setNewComment(e.target.value)}
                   rows={3}
                 />
-                <div className="flex items-center gap-3">
-                  <Button size="sm" disabled={!newComment.trim()}>Post Comment</Button>
-                  <Button size="sm" variant="outline"><Upload className="h-3 w-3 mr-1" />Attach File</Button>
-                </div>
+                <Button size="sm" disabled={!newComment.trim()} className="w-full">Post Comment</Button>
               </div>
             </CardContent>
           </Card>
@@ -103,20 +174,35 @@ const TicketDetailPage = () => {
             </CardContent>
           </Card>
 
-          {/* Admin: Assign technician */}
+          {/* Admin: Assign technician & Update status */}
           {user?.role === 'ADMIN' && (
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-base">Assign Technician</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <Select defaultValue={ticket.assignedTechnician}>
-                  <SelectTrigger><SelectValue placeholder="Select technician" /></SelectTrigger>
-                  <SelectContent>
-                    {technicians.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Button size="sm" className="w-full">Assign</Button>
-              </CardContent>
-            </Card>
+            <>
+              <Card>
+                <CardHeader className="pb-3"><CardTitle className="text-base">Assign Technician</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <Select value={ticket.assignedTechnician || ''} onValueChange={handleAssign}>
+                    <SelectTrigger><SelectValue placeholder="Select technician" /></SelectTrigger>
+                    <SelectContent>
+                      {technicians.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3"><CardTitle className="text-base">Update Status</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <Select value={newStatus} onValueChange={setNewStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Textarea placeholder="Resolution notes..." value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} rows={2} />
+                  <Button size="sm" className="w-full" onClick={handleStatusUpdate}>Update Status</Button>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Technician: Update status */}
