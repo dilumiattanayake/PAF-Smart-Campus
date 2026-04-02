@@ -103,7 +103,7 @@ const TicketDetailPage = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link to="/tickets" className="hover:text-foreground flex items-center gap-1"><ArrowLeft className="h-3 w-3" />Tickets</Link>
+        <Link to="/admin/tickets" className="hover:text-foreground flex items-center gap-1"><ArrowLeft className="h-3 w-3" />Tickets</Link>
         <span>/</span><span className="font-mono">{ticket.id}</span>
       </div>
 
