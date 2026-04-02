@@ -90,6 +90,10 @@ const TicketDetailPage = () => {
     }
   };
 
+  const handleStatusChange = (value: string) => {
+    setNewStatus(value as Ticket['status']);
+  };
+
   if (loading) return <LoadingState />;
 
   if (!ticket) return <EmptyState title="Ticket not found" action={<Link to="/tickets"><Button variant="outline"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button></Link>} />;
@@ -192,7 +196,7 @@ const TicketDetailPage = () => {
               <Card>
                 <CardHeader className="pb-3"><CardTitle className="text-base">Update Status</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
-                  <Select value={newStatus} onValueChange={setNewStatus}>
+                  <Select value={newStatus} onValueChange={handleStatusChange}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
