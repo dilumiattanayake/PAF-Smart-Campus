@@ -102,7 +102,11 @@ const TicketDetailPage = () => {
   if (!ticket) return <EmptyState title="Ticket not found" action={<Link to="/tickets"><Button variant="outline"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button></Link>} />;
 
   const technicians = techs;
-  const backLink = user?.role === 'TECHNICIAN' ? '/technician/tickets' : '/admin/tickets';
+  const backLink = user?.role === 'TECHNICIAN'
+    ? '/technician/tickets'
+    : user?.role === 'USER'
+      ? '/tickets'
+      : '/admin/tickets';
 
   return (
     <div className="space-y-6 animate-fade-in">

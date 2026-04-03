@@ -99,11 +99,12 @@ const TicketListPage = () => {
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(t => (
-                  <TableRow key={t.id} className="cursor-pointer hover:bg-muted/50">
+                  <TableRow key={t.id} className="hover:bg-muted/50">
                     <TableCell className="font-mono text-xs"><Link to={`/tickets/${t.id}`} className="hover:text-primary">{t.id}</Link></TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate">{t.title}</TableCell>
                     <TableCell className="text-muted-foreground">{t.category}</TableCell>
@@ -111,6 +112,9 @@ const TicketListPage = () => {
                     <TableCell><StatusBadge status={t.status} /></TableCell>
                     <TableCell className="text-muted-foreground">{t.assignedTechnician || '—'}</TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">{t.createdAt}</TableCell>
+                    <TableCell className="text-right">
+                      <Link to={`/tickets/${t.id}`}><Button size="sm" variant="ghost" className="h-8 text-xs">View</Button></Link>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
