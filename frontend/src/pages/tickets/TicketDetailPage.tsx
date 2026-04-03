@@ -32,10 +32,13 @@ const TicketDetailPage = () => {
       setLoading(true);
       try {
         if (id) {
-          const [ticketData, technicianData] = await Promise.all([
-            ticketService.getById(id),
-            userService.getTechnicians(),
-          ]);
+          const ticketData = await ticketService.getById(id);
+
+          let technicianData: UserType[] = [];
+          if (user?.role === 'ADMIN') {
+            technicianData = await userService.getTechnicians();
+          }
+
           if (active) {
             setTicket(ticketData || null);
             setTechs(technicianData);
@@ -57,7 +60,7 @@ const TicketDetailPage = () => {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, user?.role]);
 
   const handleAssign = async (technicianId: string) => {
     if (!ticket) return;
@@ -99,11 +102,12 @@ const TicketDetailPage = () => {
   if (!ticket) return <EmptyState title="Ticket not found" action={<Link to="/tickets"><Button variant="outline"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button></Link>} />;
 
   const technicians = techs;
+  const backLink = user?.role === 'TECHNICIAN' ? '/technician/tickets' : '/admin/tickets';
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link to="/admin/tickets" className="hover:text-foreground flex items-center gap-1"><ArrowLeft className="h-3 w-3" />Tickets</Link>
+        <Link to={backLink} className="hover:text-foreground flex items-center gap-1"><ArrowLeft className="h-3 w-3" />Tickets</Link>
         <span>/</span><span className="font-mono">{ticket.id}</span>
       </div>
 
