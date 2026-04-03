@@ -72,6 +72,7 @@ export interface Ticket {
 export interface TicketComment {
   id: string;
   ticketId: string;
+  authorId?: string;
   author: string;
   authorRole: UserRole;
   content: string;

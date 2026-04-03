@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, MapPin, User, Clock, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MapPin, User, Clock, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { ticketService } from '@/services/ticketService';
 import { userService } from '@/services/userService';
 import type { Ticket, User as UserType } from '@/types';
@@ -18,12 +19,23 @@ import type { Ticket, User as UserType } from '@/types';
 const TicketDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [techs, setTechs] = useState<UserType[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [processingCommentId, setProcessingCommentId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN');
   const [resolutionNotes, setResolutionNotes] = useState('');
+
+  const reloadTicket = async (ticketId: string) => {
+    const updatedTicket = await ticketService.getById(ticketId);
+    setTicket(updatedTicket || null);
+    return updatedTicket;
+  };
 
   useEffect(() => {
     let active = true;
@@ -66,8 +78,7 @@ const TicketDetailPage = () => {
     if (!ticket) return;
     try {
       await ticketService.assignTechnician(ticket.id, technicianId);
-      const updatedTicket = await ticketService.getById(ticket.id);
-      setTicket(updatedTicket || null);
+      await reloadTicket(ticket.id);
     } catch {
       console.error('Failed to assign technician');
     }
@@ -84,8 +95,7 @@ const TicketDetailPage = () => {
     if (!ticket) return;
     try {
       await ticketService.updateStatus(ticket.id, newStatus as Ticket['status'], resolutionNotes.trim() || undefined);
-      const updatedTicket = await ticketService.getById(ticket.id);
-      setTicket(updatedTicket || null);
+      const updatedTicket = await reloadTicket(ticket.id);
       setNewStatus(updatedTicket?.status || 'OPEN');
       setResolutionNotes('');
     } catch {
@@ -95,6 +105,65 @@ const TicketDetailPage = () => {
 
   const handleStatusChange = (value: string) => {
     setNewStatus(value as Ticket['status']);
+  };
+
+  const handlePostComment = async () => {
+    if (!ticket || !newComment.trim()) return;
+    setPostingComment(true);
+    try {
+      await ticketService.addComment(ticket.id, newComment.trim());
+      await reloadTicket(ticket.id);
+      setNewComment('');
+      toast({ title: 'Comment posted' });
+    } catch {
+      toast({ title: 'Failed to post comment', variant: 'destructive' });
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const handleStartEditComment = (commentId: string, content: string) => {
+    setEditingCommentId(commentId);
+    setEditingContent(content);
+  };
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingContent('');
+  };
+
+  const handleSaveEditComment = async (commentId: string) => {
+    if (!ticket || !editingContent.trim()) return;
+    setProcessingCommentId(commentId);
+    try {
+      await ticketService.updateComment(ticket.id, commentId, editingContent.trim());
+      await reloadTicket(ticket.id);
+      setEditingCommentId(null);
+      setEditingContent('');
+      toast({ title: 'Comment updated' });
+    } catch {
+      toast({ title: 'Failed to update comment', variant: 'destructive' });
+    } finally {
+      setProcessingCommentId(null);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!ticket) return;
+    setProcessingCommentId(commentId);
+    try {
+      await ticketService.deleteComment(ticket.id, commentId);
+      await reloadTicket(ticket.id);
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setEditingContent('');
+      }
+      toast({ title: 'Comment deleted' });
+    } catch {
+      toast({ title: 'Failed to delete comment', variant: 'destructive' });
+    } finally {
+      setProcessingCommentId(null);
+    }
   };
 
   if (loading) return <LoadingState />;
@@ -141,21 +210,56 @@ const TicketDetailPage = () => {
               <CardTitle className="text-base">Activity & Comments</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {ticket.comments?.map(c => (
+              {ticket.comments && ticket.comments.length > 0 ? ticket.comments.map(c => {
+                const canManageComment = user?.role === 'ADMIN' || (user?.id && user.id === c.authorId);
+                const isEditing = editingCommentId === c.id;
+                const isBusy = processingCommentId === c.id;
+
+                return (
                 <div key={c.id} className="flex gap-3">
                   <Avatar className="h-8 w-8 shrink-0">
                     <AvatarFallback className="text-xs bg-primary/10 text-primary">{c.author.split(' ').map(n => n[0]).join('')}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{c.author}</span>
                       <StatusBadge status={c.authorRole} />
                       <span className="text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleString()}</span>
+                      </div>
+
+                      {canManageComment && (
+                        <div className="flex items-center gap-1">
+                          {!isEditing && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => handleStartEditComment(c.id, c.content)} disabled={isBusy || !!processingCommentId}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => handleDeleteComment(c.id)} disabled={isBusy || !!processingCommentId}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{c.content}</p>
+
+                    {isEditing ? (
+                      <div className="mt-2 space-y-2">
+                        <Textarea value={editingContent} onChange={e => setEditingContent(e.target.value)} rows={3} />
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" onClick={() => handleSaveEditComment(c.id)} disabled={!editingContent.trim() || isBusy}>
+                            <Check className="h-3 w-3 mr-1" />Save
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={handleCancelEditComment} disabled={isBusy}>
+                            <X className="h-3 w-3 mr-1" />Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-1">{c.content}</p>
+                    )}
                   </div>
                 </div>
-              )) || <p className="text-sm text-muted-foreground">No comments yet.</p>}
+              )}) : <p className="text-sm text-muted-foreground">No comments yet.</p>}
 
               {/* Add comment */}
               <div className="border-t pt-4 space-y-3">
@@ -165,7 +269,7 @@ const TicketDetailPage = () => {
                   onChange={e => setNewComment(e.target.value)}
                   rows={3}
                 />
-                <Button size="sm" disabled={!newComment.trim()} className="w-full">Post Comment</Button>
+                <Button size="sm" disabled={!newComment.trim() || postingComment || !!processingCommentId} className="w-full" onClick={handlePostComment}>Post Comment</Button>
               </div>
             </CardContent>
           </Card>

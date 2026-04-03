@@ -146,7 +146,9 @@ public class TicketServiceImpl implements TicketService {
 
     private List<CommentResponse> getCommentsForTicket(String ticketId) {
         List<Comment> comments = commentRepository.findByTicketIdOrderByCreatedAtAsc(ticketId);
-        return comments.stream().map(CommentMapper::toResponse).toList();
+        return comments.stream()
+                .map(comment -> CommentMapper.toResponse(comment, resolveUserName(comment.getAuthorId())))
+                .toList();
     }
 
     private void ensureAdmin() {
