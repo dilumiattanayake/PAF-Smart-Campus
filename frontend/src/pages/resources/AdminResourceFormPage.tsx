@@ -31,9 +31,25 @@ const AdminResourceFormPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
+  const isEdit = Boolean(id);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', type: '', description: '', capacity: '', location: '', availableFrom: '08:00', availableTo: '18:00', status: 'ACTIVE' });
+  const [form, setForm] = useState({ name: '', type: '', description: '', capacity: '', location: '', availableFrom: '08:00', availableTo: '18:00', status: 'ACTIVE', image: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const typeOptions = [
+    'Lecture Hall',
+    'Lab',
+    'Computer Lab',
+    'Meeting Room',
+    'Conference Room',
+    'Seminar Room',
+    'Projector',
+    'Camera',
+    'Microphone',
+    'Speaker System',
+    '3D Printer',
+    'Other Equipment',
+  ];
 
   useEffect(() => {
     if (!id) return;
@@ -50,6 +66,7 @@ const AdminResourceFormPage = () => {
           availableFrom: res.availableFrom ?? '08:00',
           availableTo: res.availableTo ?? '18:00',
           status: res.status ?? 'AVAILABLE',
+            image: res.image ?? '',
         });
       }
       setLoading(false);
@@ -63,6 +80,14 @@ const AdminResourceFormPage = () => {
     if (!form.status) e.status = 'Required';
     if (!form.location.trim()) e.location = 'Required';
     if (!form.capacity || Number(form.capacity) < 1) e.capacity = 'Must be at least 1';
+    if ((form.availableFrom && !form.availableTo) || (!form.availableFrom && form.availableTo)) {
+      e.availableFrom = 'Start and end time required';
+      e.availableTo = 'Start and end time required';
+    }
+    if (form.availableFrom && form.availableTo && form.availableFrom >= form.availableTo) {
+      e.availableFrom = 'Start time must be before end time';
+      e.availableTo = 'End time must be after start time';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -80,9 +105,7 @@ const AdminResourceFormPage = () => {
       status: form.status as any,
       availableFrom: form.availableFrom,
       availableTo: form.availableTo,
-      image: '',
-      createdAt: '',
-      updatedAt: '',
+      image: form.image,
     };
     if (id) {
       await resourceService.update(id, payload);
@@ -97,7 +120,7 @@ const AdminResourceFormPage = () => {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
-      <PageHeader title="Add New Resource" description="Create a new campus resource or facility" />
+      <PageHeader title={isEdit ? 'Edit Resource' : 'Add New Resource'} description="Create a new campus resource or facility" />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -106,13 +129,18 @@ const AdminResourceFormPage = () => {
             </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField id="type" label="Type" error={errors.type}>
-                <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
-                  <SelectTrigger id="type" aria-label="Type"><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>
-                    {['Lecture Hall', 'Lab', 'Study Room', 'Conference Room', 'Sports Facility'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <input type="hidden" name="type" value={form.type} />
+                <Input
+                  id="type"
+                  name="type"
+                  autoComplete="off"
+                  value={form.type}
+                  onChange={e => setForm({ ...form, type: e.target.value })}
+                  list="resource-types"
+                  placeholder="Lecture Hall, Projector, Camera"
+                />
+                <datalist id="resource-types">
+                  {typeOptions.map(t => <option key={t} value={t} />)}
+                </datalist>
               </FormField>
               <FormField id="status" label="Status" error={errors.status}>
                 <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
@@ -135,6 +163,9 @@ const AdminResourceFormPage = () => {
             <FormField id="description" label="Description" error={errors.description}>
               <Textarea id="description" name="description" autoComplete="off" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} />
             </FormField>
+            <FormField id="image" label="Image URL (optional)" error={errors.image}>
+              <Input id="image" name="image" autoComplete="off" value={form.image} onChange={e => setForm({ ...form, image: e.target.value })} placeholder="https://" />
+            </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField id="availableFrom" label="Available From" error={errors.availableFrom}>
                 <Input id="availableFrom" name="availableFrom" autoComplete="off" type="time" value={form.availableFrom} onChange={e => setForm({ ...form, availableFrom: e.target.value })} />
@@ -144,7 +175,7 @@ const AdminResourceFormPage = () => {
               </FormField>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create Resource'}</Button>
+              <Button type="submit" disabled={loading}>{loading ? (isEdit ? 'Saving...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Resource')}</Button>
               <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
             </div>
           </form>

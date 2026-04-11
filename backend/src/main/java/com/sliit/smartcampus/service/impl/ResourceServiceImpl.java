@@ -3,6 +3,7 @@ package com.sliit.smartcampus.service.impl;
 import com.sliit.smartcampus.dto.resource.ResourceCreateRequest;
 import com.sliit.smartcampus.dto.resource.ResourceResponse;
 import com.sliit.smartcampus.dto.resource.ResourceUpdateRequest;
+import com.sliit.smartcampus.exception.BadRequestException;
 import com.sliit.smartcampus.exception.ForbiddenException;
 import com.sliit.smartcampus.exception.ResourceNotFoundException;
 import com.sliit.smartcampus.mapper.ResourceMapper;
@@ -30,6 +31,7 @@ public class ResourceServiceImpl implements ResourceService {
     @Override
     public ResourceResponse create(ResourceCreateRequest request) {
         ensureAdmin();
+        validateAvailability(request.getAvailableFrom(), request.getAvailableTo());
         Resource resource = ResourceMapper.toEntity(request);
         resourceRepository.save(resource);
         return ResourceMapper.toResponse(resource);
@@ -38,6 +40,7 @@ public class ResourceServiceImpl implements ResourceService {
     @Override
     public ResourceResponse update(String id, ResourceUpdateRequest request) {
         ensureAdmin();
+        validateAvailability(request.getAvailableFrom(), request.getAvailableTo());
         Resource resource = resourceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
         ResourceMapper.update(resource, request);
@@ -104,5 +107,17 @@ public class ResourceServiceImpl implements ResourceService {
             case "MAINTENANCE" -> ResourceStatus.MAINTENANCE;
             default -> null;
         };
+    }
+
+    private void validateAvailability(java.time.LocalTime availableFrom, java.time.LocalTime availableTo) {
+        if (availableFrom == null && availableTo == null) {
+            return;
+        }
+        if (availableFrom == null || availableTo == null) {
+            throw new BadRequestException("Both availableFrom and availableTo are required when setting availability windows");
+        }
+        if (!availableFrom.isBefore(availableTo)) {
+            throw new BadRequestException("availableFrom must be before availableTo");
+        }
     }
 }
