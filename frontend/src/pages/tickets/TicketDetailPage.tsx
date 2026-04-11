@@ -16,6 +16,8 @@ import { ticketService } from '@/services/ticketService';
 import { userService } from '@/services/userService';
 import type { Ticket, User as UserType } from '@/types';
 
+const COMMENT_MAX_LENGTH = 100;
+
 const TicketDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -109,6 +111,10 @@ const TicketDetailPage = () => {
 
   const handlePostComment = async () => {
     if (!ticket || !newComment.trim()) return;
+    if (newComment.trim().length > COMMENT_MAX_LENGTH) {
+      toast({ title: `Comment cannot exceed ${COMMENT_MAX_LENGTH} characters`, variant: 'destructive' });
+      return;
+    }
     setPostingComment(true);
     try {
       await ticketService.addComment(ticket.id, newComment.trim());
@@ -134,6 +140,10 @@ const TicketDetailPage = () => {
 
   const handleSaveEditComment = async (commentId: string) => {
     if (!ticket || !editingContent.trim()) return;
+    if (editingContent.trim().length > COMMENT_MAX_LENGTH) {
+      toast({ title: `Comment cannot exceed ${COMMENT_MAX_LENGTH} characters`, variant: 'destructive' });
+      return;
+    }
     setProcessingCommentId(commentId);
     try {
       await ticketService.updateComment(ticket.id, commentId, editingContent.trim());
@@ -244,7 +254,7 @@ const TicketDetailPage = () => {
 
                     {isEditing ? (
                       <div className="mt-2 space-y-2">
-                        <Textarea value={editingContent} onChange={e => setEditingContent(e.target.value)} rows={3} />
+                        <Textarea value={editingContent} onChange={e => setEditingContent(e.target.value)} rows={3} maxLength={COMMENT_MAX_LENGTH} />
                         <div className="flex items-center gap-2">
                           <Button size="sm" onClick={() => handleSaveEditComment(c.id)} disabled={!editingContent.trim() || isBusy}>
                             <Check className="h-3 w-3 mr-1" />Save
@@ -268,6 +278,7 @@ const TicketDetailPage = () => {
                   value={newComment}
                   onChange={e => setNewComment(e.target.value)}
                   rows={3}
+                  maxLength={COMMENT_MAX_LENGTH}
                 />
                 <Button size="sm" disabled={!newComment.trim() || postingComment || !!processingCommentId} className="w-full" onClick={handlePostComment}>Post Comment</Button>
               </div>
