@@ -18,6 +18,8 @@ const AdminTicketsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const sortedTickets = [...tickets].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   const loadTickets = async () => {
     const data = await ticketService.getAll();
     setTickets(data);
@@ -90,7 +92,7 @@ const AdminTicketsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tickets.map(t => (
+                {sortedTickets.map(t => (
                   <TableRow key={t.id}>
                     <TableCell className="font-mono text-xs">{t.id}</TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate">{t.title}</TableCell>
