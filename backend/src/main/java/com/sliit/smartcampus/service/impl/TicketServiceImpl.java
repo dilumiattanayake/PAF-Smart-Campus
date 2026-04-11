@@ -115,6 +115,12 @@ public class TicketServiceImpl implements TicketService {
         if (role != Role.ADMIN && role != Role.TECHNICIAN) {
             throw new ForbiddenException("Not allowed to update status");
         }
+        if (status == TicketStatus.REJECTED && role != Role.ADMIN) {
+            throw new ForbiddenException("Only admins can reject tickets");
+        }
+        if (status == TicketStatus.REJECTED && (resolutionNotes == null || resolutionNotes.isBlank())) {
+            throw new BadRequestException("Rejection reason is required");
+        }
         ticket.setStatus(status);
         if (resolutionNotes != null && !resolutionNotes.isBlank()) {
             ticket.setResolutionNotes(resolutionNotes.trim());

@@ -95,13 +95,17 @@ const TicketDetailPage = () => {
 
   const handleStatusUpdate = async () => {
     if (!ticket) return;
+    if (user?.role === 'ADMIN' && newStatus === 'REJECTED' && !resolutionNotes.trim()) {
+      toast({ title: 'Rejection reason is required', variant: 'destructive' });
+      return;
+    }
     try {
       await ticketService.updateStatus(ticket.id, newStatus as Ticket['status'], resolutionNotes.trim() || undefined);
       const updatedTicket = await reloadTicket(ticket.id);
       setNewStatus(updatedTicket?.status || 'OPEN');
       setResolutionNotes('');
     } catch {
-      console.error('Failed to update status');
+      toast({ title: 'Failed to update status', variant: 'destructive' });
     }
   };
 
@@ -205,8 +209,10 @@ const TicketDetailPage = () => {
             <CardContent>
               <p className="text-sm text-muted-foreground">{ticket.description}</p>
               {ticket.resolutionNotes && (
-                <div className="mt-4 rounded-md bg-success/10 p-3">
-                  <p className="text-xs font-semibold text-success mb-1">Resolution Notes</p>
+                <div className={`mt-4 rounded-md p-3 ${ticket.status === 'REJECTED' ? 'bg-destructive/10' : 'bg-success/10'}`}>
+                  <p className={`text-xs font-semibold mb-1 ${ticket.status === 'REJECTED' ? 'text-destructive' : 'text-success'}`}>
+                    {ticket.status === 'REJECTED' ? 'Rejection Reason' : 'Resolution Notes'}
+                  </p>
                   <p className="text-sm">{ticket.resolutionNotes}</p>
                 </div>
               )}
@@ -322,7 +328,7 @@ const TicketDetailPage = () => {
                   <Select value={newStatus} onValueChange={handleStatusChange}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
+                      {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED'].map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Textarea placeholder="Resolution notes..." value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} rows={2} />
