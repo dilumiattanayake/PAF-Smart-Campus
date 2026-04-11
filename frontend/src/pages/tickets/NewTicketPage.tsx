@@ -11,6 +11,9 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, Upload } from 'lucide-react';
 import { ticketService } from '@/services/ticketService';
 
+const TITLE_MAX_LENGTH = 100;
+const DESCRIPTION_MAX_LENGTH = 500;
+
 type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
 
 const FormField = ({ id, label, error, children }: FieldProps) => (
@@ -35,26 +38,47 @@ const NewTicketPage = () => {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.title.trim()) e.title = 'Required';
+    const title = form.title.trim();
+    const description = form.description.trim();
+    const preferredContact = form.preferredContact.trim();
+
+    if (!title) e.title = 'Required';
+    else if (title.length > TITLE_MAX_LENGTH) e.title = `Issue title cannot exceed ${TITLE_MAX_LENGTH} characters`;
+
     if (!form.category) e.category = 'Required';
-    if (!form.description.trim()) e.description = 'Required';
+
+    if (!description) e.description = 'Required';
+    else if (description.length > DESCRIPTION_MAX_LENGTH) e.description = `Description cannot exceed ${DESCRIPTION_MAX_LENGTH} characters`;
+
     if (!form.resourceOrLocation.trim()) e.resourceOrLocation = 'Required';
+    if (preferredContact && !/^\d{10}$/.test(preferredContact)) {
+      e.preferredContact = 'Preferred Contact must contain exactly 10 digits';
+    } else if (preferredContact && !preferredContact.startsWith('07')) {
+      e.preferredContact = 'Preferred Contact must start with 07';
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const preferredContact = form.preferredContact.trim();
+    if (preferredContact && !preferredContact.startsWith('07')) {
+      toast({ title: 'Invalid preferred contact', description: 'Preferred Contact must start with 07.' });
+      setErrors(prev => ({ ...prev, preferredContact: 'Preferred Contact must start with 07' }));
+      return;
+    }
     if (!validate()) return;
     setLoading(true);
     try {
       await ticketService.create({
-        title: form.title,
+        title: form.title.trim(),
         category: form.category,
-        description: form.description,
+        description: form.description.trim(),
         priority: form.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
-        resourceOrLocation: form.resourceOrLocation,
-        preferredContact: form.preferredContact,
+        resourceOrLocation: form.resourceOrLocation.trim(),
+        preferredContact: form.preferredContact.trim(),
         attachmentUrls: [],
       });
       toast({ title: 'Ticket created', description: 'Your maintenance request has been submitted.' });
@@ -73,7 +97,8 @@ const NewTicketPage = () => {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField id="title" label="Issue Title" error={errors.title}>
-              <Input id="title" name="title" autoComplete="off" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief summary of the issue" />
+              <Input id="title" name="title" autoComplete="off" value={form.title} maxLength={TITLE_MAX_LENGTH} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief summary of the issue" />
+              <p className="text-xs text-muted-foreground text-right">{form.title.length}/{TITLE_MAX_LENGTH}</p>
             </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField id="category" label="Category" error={errors.category}>
@@ -96,13 +121,23 @@ const NewTicketPage = () => {
               </FormField>
             </div>
             <FormField id="description" label="Description" error={errors.description}>
-              <Textarea id="description" name="description" autoComplete="off" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Provide details about the issue..." />
+              <Textarea id="description" name="description" autoComplete="off" value={form.description} maxLength={DESCRIPTION_MAX_LENGTH} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Provide details about the issue..." />
+              <p className="text-xs text-muted-foreground text-right">{form.description.length}/{DESCRIPTION_MAX_LENGTH}</p>
             </FormField>
             <FormField id="resourceOrLocation" label="Resource / Location" error={errors.resourceOrLocation}>
               <Input id="resourceOrLocation" name="resourceOrLocation" autoComplete="off" value={form.resourceOrLocation} onChange={e => setForm({ ...form, resourceOrLocation: e.target.value })} placeholder="e.g., Building A, Lecture Hall A" />
             </FormField>
             <FormField id="preferredContact" label="Preferred Contact (optional)" error={errors.preferredContact}>
-              <Input id="preferredContact" name="preferredContact" autoComplete="off" value={form.preferredContact} onChange={e => setForm({ ...form, preferredContact: e.target.value })} placeholder="Email or phone" />
+              <Input
+                id="preferredContact"
+                name="preferredContact"
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={10}
+                value={form.preferredContact}
+                onChange={e => setForm({ ...form, preferredContact: e.target.value.replace(/\D/g, '') })}
+                placeholder="10-digit phone number"
+              />
             </FormField>
 
             {/* File upload UI */}
