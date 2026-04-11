@@ -115,6 +115,10 @@ const TicketDetailPage = () => {
 
   const handlePostComment = async () => {
     if (!ticket || !newComment.trim()) return;
+    if (ticket.status === 'REJECTED' || ticket.status === 'CLOSED') {
+      toast({ title: 'Comments are disabled for this ticket', variant: 'destructive' });
+      return;
+    }
     if (newComment.trim().length > COMMENT_MAX_LENGTH) {
       toast({ title: `Comment cannot exceed ${COMMENT_MAX_LENGTH} characters`, variant: 'destructive' });
       return;
@@ -144,6 +148,10 @@ const TicketDetailPage = () => {
 
   const handleSaveEditComment = async (commentId: string) => {
     if (!ticket || !editingContent.trim()) return;
+    if (ticket.status === 'REJECTED' || ticket.status === 'CLOSED') {
+      toast({ title: 'Comments are disabled for this ticket', variant: 'destructive' });
+      return;
+    }
     if (editingContent.trim().length > COMMENT_MAX_LENGTH) {
       toast({ title: `Comment cannot exceed ${COMMENT_MAX_LENGTH} characters`, variant: 'destructive' });
       return;
@@ -164,6 +172,10 @@ const TicketDetailPage = () => {
 
   const handleDeleteComment = async (commentId: string) => {
     if (!ticket) return;
+    if (ticket.status === 'REJECTED' || ticket.status === 'CLOSED') {
+      toast({ title: 'Comments are disabled for this ticket', variant: 'destructive' });
+      return;
+    }
     setProcessingCommentId(commentId);
     try {
       await ticketService.deleteComment(ticket.id, commentId);
@@ -185,6 +197,7 @@ const TicketDetailPage = () => {
   if (!ticket) return <EmptyState title="Ticket not found" action={<Link to="/tickets"><Button variant="outline"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button></Link>} />;
 
   const technicians = techs;
+  const isCommentingLocked = ticket.status === 'REJECTED' || ticket.status === 'CLOSED';
   const backLink = user?.role === 'TECHNICIAN'
     ? '/technician/tickets'
     : user?.role === 'USER'
@@ -227,7 +240,7 @@ const TicketDetailPage = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {ticket.comments && ticket.comments.length > 0 ? ticket.comments.map(c => {
-                const canManageComment = user?.role === 'ADMIN' || (user?.id && user.id === c.authorId);
+                const canManageComment = !isCommentingLocked && (user?.role === 'ADMIN' || (user?.id && user.id === c.authorId));
                 const isEditing = editingCommentId === c.id;
                 const isBusy = processingCommentId === c.id;
 
@@ -279,14 +292,20 @@ const TicketDetailPage = () => {
 
               {/* Add comment */}
               <div className="border-t pt-4 space-y-3">
-                <Textarea
-                  placeholder="Add a comment..."
-                  value={newComment}
-                  onChange={e => setNewComment(e.target.value)}
-                  rows={3}
-                  maxLength={COMMENT_MAX_LENGTH}
-                />
-                <Button size="sm" disabled={!newComment.trim() || postingComment || !!processingCommentId} className="w-full" onClick={handlePostComment}>Post Comment</Button>
+                {isCommentingLocked ? (
+                  <p className="text-sm text-muted-foreground">Comments are disabled because this ticket is {ticket.status === 'REJECTED' ? 'rejected' : 'closed'}.</p>
+                ) : (
+                  <>
+                    <Textarea
+                      placeholder="Add a comment..."
+                      value={newComment}
+                      onChange={e => setNewComment(e.target.value)}
+                      rows={3}
+                      maxLength={COMMENT_MAX_LENGTH}
+                    />
+                    <Button size="sm" disabled={!newComment.trim() || postingComment || !!processingCommentId} className="w-full" onClick={handlePostComment}>Post Comment</Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

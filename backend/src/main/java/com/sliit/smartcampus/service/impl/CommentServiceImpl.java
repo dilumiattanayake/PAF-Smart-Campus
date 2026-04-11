@@ -11,6 +11,7 @@ import com.sliit.smartcampus.model.Ticket;
 import com.sliit.smartcampus.model.User;
 import com.sliit.smartcampus.model.enums.NotificationType;
 import com.sliit.smartcampus.model.enums.Role;
+import com.sliit.smartcampus.model.enums.TicketStatus;
 import com.sliit.smartcampus.repository.CommentRepository;
 import com.sliit.smartcampus.repository.TicketRepository;
 import com.sliit.smartcampus.repository.UserRepository;
@@ -40,6 +41,7 @@ public class CommentServiceImpl implements CommentService {
         Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
 
         ensureTicketAccess(ticket, role, userId);
+        ensureCommentingAllowed(ticket);
 
         Comment comment = Comment.builder()
                 .ticketId(ticketId)
@@ -74,6 +76,7 @@ public class CommentServiceImpl implements CommentService {
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
         Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
         ensureTicketAccess(ticket, role, userId);
+        ensureCommentingAllowed(ticket);
 
         Comment comment = commentRepository.findByIdAndTicketId(commentId, ticketId)
             .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
@@ -94,6 +97,7 @@ public class CommentServiceImpl implements CommentService {
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
         Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
         ensureTicketAccess(ticket, role, userId);
+        ensureCommentingAllowed(ticket);
 
         Comment comment = commentRepository.findByIdAndTicketId(commentId, ticketId)
             .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
@@ -126,6 +130,12 @@ public class CommentServiceImpl implements CommentService {
                 || (role == Role.TECHNICIAN && userId.equals(ticket.getAssignedTechnicianId()));
         if (!allowed) {
             throw new ForbiddenException("Not allowed to access comments for this ticket");
+        }
+    }
+
+    private void ensureCommentingAllowed(Ticket ticket) {
+        if (ticket.getStatus() == TicketStatus.CLOSED || ticket.getStatus() == TicketStatus.REJECTED) {
+            throw new ForbiddenException("Comments are disabled for closed or rejected tickets");
         }
     }
 
