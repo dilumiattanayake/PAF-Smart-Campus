@@ -11,13 +11,37 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ticketService } from '@/services/ticketService';
 import type { Ticket } from '@/types';
 
-const TechnicianTicketsPage = () => {
+type TechnicianTicketsPageProps = {
+  mode?: 'tasks' | 'tickets';
+};
+
+const STATUS_BY_MODE: Record<NonNullable<TechnicianTicketsPageProps['mode']>, Ticket['status'][]> = {
+  tasks: ['IN_PROGRESS'],
+  tickets: ['RESOLVED', 'CLOSED'],
+};
+
+const TechnicianTicketsPage = ({ mode = 'tickets' }: TechnicianTicketsPageProps) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const allowedStatuses = STATUS_BY_MODE[mode];
+  const statusOptions = allowedStatuses.map(s => ({ label: s.replace(/_/g, ' '), value: s }));
+  const pageTitle = mode === 'tasks' ? 'My Tasks' : 'My Tickets';
+  const pageDescription = mode === 'tasks'
+    ? 'Tickets currently in progress'
+    : 'Resolved and closed ticket history';
+  const searchPlaceholder = mode === 'tasks'
+    ? 'Search in-progress tasks...'
+    : 'Search resolved and closed tickets...';
+  const emptyStateTitle = mode === 'tasks' ? 'No tasks in progress' : 'No resolved tickets';
+  const emptyStateDescription = mode === 'tasks'
+    ? 'You do not have any in-progress tickets right now.'
+    : 'You do not have resolved or closed tickets yet.';
+  const queueLabel = mode === 'tasks' ? 'Task queue' : 'Ticket history';
 
   useEffect(() => {
     let active = true;
@@ -50,6 +74,7 @@ const TechnicianTicketsPage = () => {
   }, []);
 
   const filtered = tickets.filter(ticket => {
+    if (!allowedStatuses.includes(ticket.status)) return false;
     const query = search.toLowerCase();
     if (query && !ticket.title.toLowerCase().includes(query) && !ticket.id.toLowerCase().includes(query) && !ticket.category.toLowerCase().includes(query)) {
       return false;
@@ -62,20 +87,20 @@ const TechnicianTicketsPage = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Assigned Tickets"
-        description="Tickets currently assigned to you"
-        actions={<div className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-3 py-1 text-xs text-muted-foreground"><Wrench className="h-3 w-3" />Technician queue</div>}
+        title={pageTitle}
+        description={pageDescription}
+        actions={<div className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-3 py-1 text-xs text-muted-foreground"><Wrench className="h-3 w-3" />{queueLabel}</div>}
       />
 
       <SearchFilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search assigned tickets..."
+        searchPlaceholder={searchPlaceholder}
         filters={[
           {
             key: 'status',
             label: 'Status',
-            options: ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED'].map(s => ({ label: s.replace(/_/g, ' '), value: s })),
+            options: statusOptions,
             value: statusFilter,
             onChange: setStatusFilter,
           },
@@ -91,7 +116,7 @@ const TechnicianTicketsPage = () => {
 
       {loading ? (
         <Card>
-          <div className="p-6 text-sm text-muted-foreground">Loading assigned tickets...</div>
+          <div className="p-6 text-sm text-muted-foreground">Loading tickets...</div>
         </Card>
       ) : error ? (
         <Card>
@@ -99,8 +124,8 @@ const TechnicianTicketsPage = () => {
         </Card>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title="No assigned tickets"
-          description="You do not have any maintenance tickets assigned right now."
+          title={emptyStateTitle}
+          description={emptyStateDescription}
           action={<Link to="/dashboard"><Button variant="outline"><ArrowRight className="h-4 w-4 mr-1" />Back to dashboard</Button></Link>}
         />
       ) : (
