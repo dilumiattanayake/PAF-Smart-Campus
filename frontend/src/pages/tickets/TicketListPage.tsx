@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ticketService } from '@/services/ticketService';
+import { userService } from '@/services/userService';
 import type { Ticket } from '@/types';
 
 const TicketListPage = () => {
@@ -18,6 +19,7 @@ const TicketListPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [technicianNamesById, setTechnicianNamesById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,13 +31,27 @@ const TicketListPage = () => {
       setError(null);
       try {
         const data = await ticketService.getMyTickets(user?.name || '');
+        const technicianIds = Array.from(new Set(data.map(ticket => ticket.assignedTechnician).filter((id): id is string => Boolean(id))));
+        const nameResults = await Promise.all(
+          technicianIds.map(async technicianId => {
+            try {
+              const technician = await userService.getById(technicianId);
+              return [technicianId, technician.name] as const;
+            } catch {
+              return [technicianId, technicianId] as const;
+            }
+          })
+        );
+
         if (active) {
           setTickets(data);
+          setTechnicianNamesById(Object.fromEntries(nameResults));
         }
       } catch {
         if (active) {
           setError('Failed to load tickets. Please try again.');
           setTickets([]);
+          setTechnicianNamesById({});
         }
       } finally {
         if (active) {
@@ -56,7 +72,7 @@ const TicketListPage = () => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     return true;
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -110,7 +126,7 @@ const TicketListPage = () => {
                     <TableCell className="text-muted-foreground">{t.category}</TableCell>
                     <TableCell><StatusBadge status={t.priority} /></TableCell>
                     <TableCell><StatusBadge status={t.status} /></TableCell>
-                    <TableCell className="text-muted-foreground">{t.assignedTechnician || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{(t.assignedTechnician && technicianNamesById[t.assignedTechnician]) || t.assignedTechnician || '—'}</TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">{t.createdAt}</TableCell>
                     <TableCell className="text-right">
                       <Link to={`/tickets/${t.id}`}><Button size="sm" variant="ghost" className="h-8 text-xs">View</Button></Link>
