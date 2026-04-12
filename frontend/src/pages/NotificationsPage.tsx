@@ -200,10 +200,45 @@ const NotificationsPage = () => {
     return notifDate === today;
   };
 
+  const isTicketNotification = (type: string) => {
+    return ['TICKET_ASSIGNED', 'TICKET_STATUS', 'TICKET'].includes(type);
+  };
+
+  const getTicketPriority = (type: string) => {
+    switch (type) {
+      case 'TICKET_ASSIGNED':
+        return 'HIGH';
+      case 'TICKET_STATUS':
+        return 'MEDIUM';
+      case 'TICKET':
+      default:
+        return 'LOW';
+    }
+  };
+
+  const getPriorityColor = (type: string) => {
+    if (!isTicketNotification(type)) return '';
+    const priority = getTicketPriority(type);
+    switch (priority) {
+      case 'HIGH':
+        return 'bg-red-500';
+      case 'MEDIUM':
+        return 'bg-amber-500';
+      case 'LOW':
+      default:
+        return 'bg-green-500';
+    }
+  };
+
+  const getPriorityLabel = (type: string) => {
+    if (!isTicketNotification(type)) return '';
+    return getTicketPriority(type);
+  };
+
   const todayCount = notifications.filter(n => isToday(n.createdAt)).length;
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const highPriorityCount = notifications.filter(n => 
-    ['TICKET_ASSIGNED', 'TICKET_STATUS', 'BOOKING_STATUS'].includes(n.type)
+    isTicketNotification(n.type) && getTicketPriority(n.type) === 'HIGH'
   ).length;
 
   return (
@@ -216,7 +251,7 @@ const NotificationsPage = () => {
             <Button size="sm" variant="outline" onClick={markAllRead} disabled={!notifications.length}>
               <CheckCheck className="h-3 w-3 mr-1" />Mark all read
             </Button>
-            <Button size="sm" variant="destructive" onClick={deleteAllNotifications} disabled={!notifications.length}>
+            <Button size="sm" variant="default" onClick={deleteAllNotifications} disabled={!notifications.length}>
               <Trash2 className="h-3 w-3 mr-1" />Clear all
             </Button>
           </div>
@@ -277,7 +312,7 @@ const NotificationsPage = () => {
           <Button size="sm" variant="outline" onClick={markSelectedAsRead}>
             <CheckCheck className="h-3 w-3 mr-1" />Mark as read
           </Button>
-          <Button size="sm" variant="destructive" onClick={deleteSelected}>
+          <Button size="sm" variant="default" onClick={deleteSelected}>
             <Trash2 className="h-3 w-3 mr-1" />Delete
           </Button>
         </div>
@@ -304,7 +339,12 @@ const NotificationsPage = () => {
                 onCheckedChange={() => toggleSelect(n.id!)}
                 className="mt-1"
               />
-              <span className="text-xl">{typeIcon[n.type] || '📢'}</span>
+              <div className="flex items-center gap-2">
+                {isTicketNotification(n.type) && (
+                  <span className={`h-3 w-3 rounded-full ${getPriorityColor(n.type)}`} title={`Priority: ${getPriorityLabel(n.type)}`} />
+                )}
+                <span className="text-xl">{typeIcon[n.type] || '📢'}</span>
+              </div>
               <div className="flex-1 min-w-0" onClick={() => selected.size === 0 && goToNotification(n)}>
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-semibold">{n.title}</h4>
@@ -315,8 +355,7 @@ const NotificationsPage = () => {
               </div>
               <Button 
                 size="sm" 
-                variant="ghost" 
-                className="text-destructive hover:bg-destructive/10"
+                variant="default"
                 onClick={(e) => deleteNotification(n.id, e)}
               >
                 <Trash2 className="h-4 w-4" />
