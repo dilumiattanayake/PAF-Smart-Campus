@@ -1,6 +1,8 @@
 package com.sliit.smartcampus.service.impl;
 
+import com.sliit.smartcampus.dto.notification.NotificationCreateRequest;
 import com.sliit.smartcampus.dto.notification.NotificationResponse;
+import com.sliit.smartcampus.exception.ForbiddenException;
 import com.sliit.smartcampus.exception.ResourceNotFoundException;
 import com.sliit.smartcampus.mapper.NotificationMapper;
 import com.sliit.smartcampus.model.Notification;
@@ -10,6 +12,7 @@ import com.sliit.smartcampus.service.NotificationService;
 import com.sliit.smartcampus.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -59,5 +62,46 @@ public class NotificationServiceImpl implements NotificationService {
                 .read(false)
                 .build();
         notificationRepository.save(notification);
+    }
+
+    @Override
+    @Transactional
+    public NotificationResponse createNotificationByAdmin(NotificationCreateRequest request) {
+        Notification notification = Notification.builder()
+                .userId(request.getUserId())
+                .title(request.getTitle())
+                .message(request.getMessage())
+                .type(request.getType())
+                .referenceId(request.getReferenceId())
+                .read(false)
+                .build();
+        notificationRepository.save(notification);
+        return NotificationMapper.toResponse(notification);
+    }
+
+    @Override
+    @Transactional
+    public void deleteNotification(String id) {
+        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+        if (!notification.getUserId().equals(userId)) {
+            throw new ForbiddenException("Cannot delete another user's notification");
+        }
+        notificationRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllNotifications() {
+        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        notificationRepository.deleteAll(notifications);
+    }
+
+    @Override
+    public long getUnreadCount() {
+        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        return notificationRepository.countByUserIdAndReadFalse(userId);
     }
 }
