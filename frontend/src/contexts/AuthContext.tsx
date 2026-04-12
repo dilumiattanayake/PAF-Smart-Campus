@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  completeOAuthLogin: (token: string) => Promise<void>;
   loginAsRole: (role: UserRole) => void;
   logout: () => void;
   isLoading: boolean;
@@ -26,6 +27,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const logged = await authService.login(email, password);
       localStorage.setItem('campus_user', JSON.stringify(logged));
       setUser(logged);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const completeOAuthLogin = useCallback(async (token: string) => {
+    setIsLoading(true);
+    try {
+      localStorage.setItem('campus_token', token);
+      const current = await authService.getCurrentUser();
+      localStorage.setItem('campus_user', JSON.stringify(current));
+      setUser(current);
     } finally {
       setIsLoading(false);
     }
@@ -58,11 +71,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     localStorage.removeItem('campus_user');
+    localStorage.removeItem('campus_token');
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginAsRole, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, completeOAuthLogin, loginAsRole, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

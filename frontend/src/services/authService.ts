@@ -26,6 +26,15 @@ interface AuthResponse {
   };
 }
 
+interface UserProfileResponse {
+  id: string;
+  fullName: string;
+  email: string;
+  role: 'USER' | 'ADMIN' | 'TECHNICIAN';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 const mapUser = (u: AuthResponse['user']): User => ({
   id: u.id,
   name: u.fullName,
@@ -51,6 +60,13 @@ export const authService = {
     localStorage.setItem('campus_token', data.token);
     localStorage.setItem('campus_user', JSON.stringify(mapUser(data.user)));
     return mapUser(data.user);
+  },
+  getCurrentUser: async (): Promise<User> => {
+    const { data } = await api.get<UserProfileResponse>('/api/auth/me');
+    return mapUser(data);
+  },
+  getOAuthAuthorizeUrl: (): string => {
+    return `${baseURL}/oauth2/authorization/google`;
   },
   logout: async (): Promise<void> => {
     localStorage.removeItem('campus_token');

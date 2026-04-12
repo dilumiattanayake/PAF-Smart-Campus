@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { GraduationCap, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+import { authService } from '@/services/authService';
 
 const LoginPage = () => {
   const { login, isLoading } = useAuth();
@@ -38,6 +39,10 @@ const LoginPage = () => {
     } catch {
       toast({ title: 'Login failed', description: 'Invalid credentials. Please try again.', variant: 'destructive' });
     }
+  };
+
+  const handleGoogleSignIn = () => {
+    window.location.assign(authService.getOAuthAuthorizeUrl());
   };
 
   return (
@@ -121,6 +126,10 @@ const LoginPage = () => {
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Signing in...' : 'Sign in'}
+                </Button>
+
+                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+                  Continue with Google
                 </Button>
 
                 <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
