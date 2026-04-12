@@ -30,6 +30,7 @@ const NotificationsPage = () => {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const isAdmin = user?.role === 'ADMIN';
+  const isTechnician = user?.role === 'TECHNICIAN';
 
   const load = async () => {
     setLoading(true);
@@ -254,7 +255,7 @@ const NotificationsPage = () => {
             <Button size="sm" variant="outline" onClick={markAllRead} disabled={!notifications.length}>
               <CheckCheck className="h-3 w-3 mr-1" />Mark all read
             </Button>
-            {isAdmin && (
+            {(isAdmin || isTechnician) && (
               <Button size="sm" variant="default" onClick={deleteAllNotifications} disabled={!notifications.length}>
                 <Trash2 className="h-3 w-3 mr-1" />Clear all
               </Button>
@@ -278,7 +279,7 @@ const NotificationsPage = () => {
         </TabsList>
       </Tabs>
 
-      {isAdmin && (
+      {(isAdmin || isTechnician) && (
         <div className="flex flex-col sm:flex-row gap-3">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-full sm:w-48">
@@ -309,7 +310,7 @@ const NotificationsPage = () => {
         </div>
       )}
 
-      {isAdmin && selected.size > 0 && (
+      {(isAdmin || isTechnician) && selected.size > 0 && (
         <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
           <span className="text-sm font-medium">{selected.size} selected</span>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
@@ -328,7 +329,7 @@ const NotificationsPage = () => {
       <div className="space-y-3">
         {loading && <p className="text-sm text-muted-foreground">Loading notifications...</p>}
         {!loading && sorted.length === 0 && <p className="text-sm text-muted-foreground">No notifications.</p>}
-        {isAdmin && !loading && sorted.length > 0 && (
+        {(isAdmin || isTechnician) && !loading && sorted.length > 0 && (
           <div className="mb-3 flex items-center gap-3 px-3 py-2">
             <Checkbox
               checked={selected.size > 0 && selected.size === sorted.length}
@@ -341,7 +342,7 @@ const NotificationsPage = () => {
         {!loading && sorted.map(n => (
           <Card key={n.id} className={`transition-colors ${!n.isRead ? 'border-primary/30 bg-primary/5' : ''} ${selected.has(n.id!) ? 'border-primary bg-primary/10' : 'cursor-pointer'}`}>
             <CardContent className="flex items-start gap-3 py-4">
-              {isAdmin && (
+              {(isAdmin || isTechnician) && (
                 <Checkbox
                   checked={selected.has(n.id!)}
                   onCheckedChange={() => toggleSelect(n.id!)}
@@ -354,7 +355,7 @@ const NotificationsPage = () => {
                 )}
                 <span className="text-xl">{typeIcon[n.type] || '📢'}</span>
               </div>
-              <div className="flex-1 min-w-0" onClick={() => (isAdmin ? selected.size === 0 : true) && goToNotification(n)}>
+              <div className="flex-1 min-w-0" onClick={() => ((isAdmin || isTechnician) ? selected.size === 0 : true) && goToNotification(n)}>
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-semibold">{n.title}</h4>
                   {!n.isRead && <span className="h-2 w-2 rounded-full bg-primary" />}
@@ -362,7 +363,7 @@ const NotificationsPage = () => {
                 <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
                 <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
               </div>
-              {isAdmin && (
+              {(isAdmin || isTechnician) && (
                 <Button 
                   size="sm" 
                   variant="default"
