@@ -17,9 +17,11 @@ import { StatCard } from '@/components/shared/StatCard';
 import { notificationService } from '@/services/notificationService';
 import type { Notification } from '@/types';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NotificationsPage = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState('all');
@@ -27,6 +29,7 @@ const NotificationsPage = () => {
   const [sortOrder, setSortOrder] = useState('newest');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const isAdmin = user?.role === 'ADMIN';
 
   const load = async () => {
     setLoading(true);
@@ -251,9 +254,11 @@ const NotificationsPage = () => {
             <Button size="sm" variant="outline" onClick={markAllRead} disabled={!notifications.length}>
               <CheckCheck className="h-3 w-3 mr-1" />Mark all read
             </Button>
-            <Button size="sm" variant="default" onClick={deleteAllNotifications} disabled={!notifications.length}>
-              <Trash2 className="h-3 w-3 mr-1" />Clear all
-            </Button>
+            {isAdmin && (
+              <Button size="sm" variant="default" onClick={deleteAllNotifications} disabled={!notifications.length}>
+                <Trash2 className="h-3 w-3 mr-1" />Clear all
+              </Button>
+            )}
           </div>
         }
       />
@@ -273,36 +278,38 @@ const NotificationsPage = () => {
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="BOOKING">📅 Booking</SelectItem>
-            <SelectItem value="TICKET">🔧 Ticket</SelectItem>
-            <SelectItem value="COMMENT">💬 Comment</SelectItem>
-            <SelectItem value="SYSTEM">⚙️ System</SelectItem>
-          </SelectContent>
-        </Select>
+      {isAdmin && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="BOOKING">📅 Booking</SelectItem>
+              <SelectItem value="TICKET">🔧 Ticket</SelectItem>
+              <SelectItem value="COMMENT">💬 Comment</SelectItem>
+              <SelectItem value="SYSTEM">⚙️ System</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <Select value={sortOrder} onValueChange={setSortOrder}>
-          <SelectTrigger className="w-full sm:w-48">
-            <ArrowUpDown className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="newest">Newest First</SelectItem>
-            <SelectItem value="oldest">Oldest First</SelectItem>
-            <SelectItem value="unread-first">Unread First</SelectItem>
-            <SelectItem value="priority">High Priority First</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+          <Select value={sortOrder} onValueChange={setSortOrder}>
+            <SelectTrigger className="w-full sm:w-48">
+              <ArrowUpDown className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest First</SelectItem>
+              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="unread-first">Unread First</SelectItem>
+              <SelectItem value="priority">High Priority First</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-      {selected.size > 0 && (
+      {isAdmin && selected.size > 0 && (
         <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
           <span className="text-sm font-medium">{selected.size} selected</span>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
@@ -321,7 +328,7 @@ const NotificationsPage = () => {
       <div className="space-y-3">
         {loading && <p className="text-sm text-muted-foreground">Loading notifications...</p>}
         {!loading && sorted.length === 0 && <p className="text-sm text-muted-foreground">No notifications.</p>}
-        {!loading && sorted.length > 0 && (
+        {isAdmin && !loading && sorted.length > 0 && (
           <div className="mb-3 flex items-center gap-3 px-3 py-2">
             <Checkbox
               checked={selected.size > 0 && selected.size === sorted.length}
@@ -334,18 +341,20 @@ const NotificationsPage = () => {
         {!loading && sorted.map(n => (
           <Card key={n.id} className={`transition-colors ${!n.isRead ? 'border-primary/30 bg-primary/5' : ''} ${selected.has(n.id!) ? 'border-primary bg-primary/10' : 'cursor-pointer'}`}>
             <CardContent className="flex items-start gap-3 py-4">
-              <Checkbox
-                checked={selected.has(n.id!)}
-                onCheckedChange={() => toggleSelect(n.id!)}
-                className="mt-1"
-              />
+              {isAdmin && (
+                <Checkbox
+                  checked={selected.has(n.id!)}
+                  onCheckedChange={() => toggleSelect(n.id!)}
+                  className="mt-1"
+                />
+              )}
               <div className="flex items-center gap-2">
                 {isTicketNotification(n.type) && (
                   <span className={`h-3 w-3 rounded-full ${getPriorityColor(n.type)}`} title={`Priority: ${getPriorityLabel(n.type)}`} />
                 )}
                 <span className="text-xl">{typeIcon[n.type] || '📢'}</span>
               </div>
-              <div className="flex-1 min-w-0" onClick={() => selected.size === 0 && goToNotification(n)}>
+              <div className="flex-1 min-w-0" onClick={() => (isAdmin ? selected.size === 0 : true) && goToNotification(n)}>
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-semibold">{n.title}</h4>
                   {!n.isRead && <span className="h-2 w-2 rounded-full bg-primary" />}
@@ -353,13 +362,15 @@ const NotificationsPage = () => {
                 <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
                 <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
               </div>
-              <Button 
-                size="sm" 
-                variant="default"
-                onClick={(e) => deleteNotification(n.id, e)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {isAdmin && (
+                <Button 
+                  size="sm" 
+                  variant="default"
+                  onClick={(e) => deleteNotification(n.id, e)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </CardContent>
           </Card>
         ))}
