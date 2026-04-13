@@ -315,12 +315,17 @@ const NotificationsPage = () => {
   const highPriorityCount = notifications.filter(n => 
     isTicketNotification(n.type) && getTicketPriority(n.type) === 'HIGH'
   ).length;
+  const technicianActionCount = notifications.filter(n => !n.isRead && isTicketNotification(n.type)).length;
+  const pageTitle = isTechnician ? 'Technician Notifications' : 'Notifications';
+  const pageDescription = isTechnician
+    ? 'Track ticket assignments, status updates, and comments in one focused inbox.'
+    : 'Stay updated with all system activities and alerts. Filter, search, and take action quickly.';
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Notifications"
-        description="Stay updated with all system activities and alerts. Filter, search, and take action quickly."
+        title={pageTitle}
+        description={pageDescription}
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={markAllRead} disabled={!notifications.length}>
@@ -338,9 +343,45 @@ const NotificationsPage = () => {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total" value={notifications.length} icon={Bell} />
         <StatCard title="Unread" value={unreadCount} icon={AlertCircle} />
-        <StatCard title="Today" value={todayCount} icon={Calendar} />
+        <StatCard title={isTechnician ? 'Action Required' : 'Today'} value={isTechnician ? technicianActionCount : todayCount} icon={Calendar} />
         <StatCard title="High Priority" value={highPriorityCount} icon={Zap} />
       </div>
+
+      {isTechnician && (
+        <Card className="border-amber-200 bg-amber-50/40 dark:bg-amber-950/20 dark:border-amber-900/30">
+          <CardContent className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Technician Inbox</p>
+              <p className="text-xs text-muted-foreground">Prioritize assigned tickets and unread updates first.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setFilter('unread');
+                  setTypeFilter('TICKET');
+                  setSortOrder('priority');
+                }}
+              >
+                Focus on Ticket Alerts
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setFilter('all');
+                  setTypeFilter('all');
+                  setSortOrder('newest');
+                  setSearchQuery('');
+                }}
+              >
+                Reset View
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={filter} onValueChange={setFilter}>
         <TabsList>
@@ -431,6 +472,9 @@ const NotificationsPage = () => {
         {!isAdmin && !isTechnician && (
           <p className="text-xs text-muted-foreground">Tip: Click a notification to open the related booking or ticket.</p>
         )}
+        {isTechnician && (
+          <p className="text-xs text-muted-foreground">Tip: Use "Focus on Ticket Alerts" to quickly triage assigned work.</p>
+        )}
       </div>
 
       {(isAdmin || isTechnician) && selected.size > 0 && (
@@ -443,7 +487,7 @@ const NotificationsPage = () => {
           <Button size="sm" variant="outline" onClick={markSelectedAsRead}>
             <CheckCheck className="h-3 w-3 mr-1" />Mark as read
           </Button>
-          <Button size="sm" variant="default" onClick={deleteSelected}>
+          <Button size="sm" variant="destructive" onClick={deleteSelected}>
             <Trash2 className="h-3 w-3 mr-1" />Delete
           </Button>
         </div>
@@ -517,6 +561,18 @@ const NotificationsPage = () => {
                 <Button
                   size="sm"
                   variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToNotification(n);
+                  }}
+                >
+                  Open
+                </Button>
+              )}
+              {isTechnician && (
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={(e) => {
                     e.stopPropagation();
                     goToNotification(n);
