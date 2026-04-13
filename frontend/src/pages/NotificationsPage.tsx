@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCheck, Trash2, Bell, AlertCircle, Calendar, Zap, Filter, ArrowUpDown, X, Send } from 'lucide-react';
+import { CheckCheck, Trash2, Bell, AlertCircle, Calendar, Zap, Filter, ArrowUpDown, X, Send, Search } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,6 +14,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { StatCard } from '@/components/shared/StatCard';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { notificationService } from '@/services/notificationService';
 import type { Notification } from '@/types';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +30,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { api } from '@/services/authService';
 
 const NotificationsPage = () => {
@@ -39,6 +41,7 @@ const NotificationsPage = () => {
   const [filter, setFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('newest');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
@@ -116,7 +119,18 @@ const NotificationsPage = () => {
         return baseType === typeFilter;
       });
 
-  const sorted = [...typeFilteredAndRead].sort((a, b) => {
+  const searched = !searchQuery.trim()
+    ? typeFilteredAndRead
+    : typeFilteredAndRead.filter(n => {
+        const q = searchQuery.toLowerCase();
+        return (
+          n.title.toLowerCase().includes(q) ||
+          n.message.toLowerCase().includes(q) ||
+          n.type.toLowerCase().includes(q)
+        );
+      });
+
+  const sorted = [...searched].sort((a, b) => {
     switch (sortOrder) {
       case 'newest':
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -304,24 +318,14 @@ const NotificationsPage = () => {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Notifications"
-        description="Stay updated with all system activities and alerts"
+        description="Stay updated with all system activities and alerts. Filter, search, and take action quickly."
         actions={
           <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button 
-                size="sm" 
-                variant="default" 
-                onClick={() => setShowBroadcastModal(true)}
-                className="gap-2"
-              >
-                <Send className="h-3 w-3" />Send Broadcast
-              </Button>
-            )}
             <Button size="sm" variant="outline" onClick={markAllRead} disabled={!notifications.length}>
               <CheckCheck className="h-3 w-3 mr-1" />Mark all read
             </Button>
             {(isAdmin || isTechnician) && (
-              <Button size="sm" variant="default" onClick={deleteAllNotifications} disabled={!notifications.length}>
+              <Button size="sm" variant="destructive" onClick={deleteAllNotifications} disabled={!notifications.length}>
                 <Trash2 className="h-3 w-3 mr-1" />Clear all
               </Button>
             )}
@@ -344,8 +348,38 @@ const NotificationsPage = () => {
         </TabsList>
       </Tabs>
 
+      {isAdmin && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Admin Broadcast Tools</p>
+              <p className="text-xs text-muted-foreground">
+                Send targeted announcements to users, technicians, or admins from one place.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">Broadcast</Badge>
+              <Button size="sm" className="gap-2" onClick={() => setShowBroadcastModal(true)}>
+                <Send className="h-3 w-3" />New Broadcast
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {(isAdmin || isTechnician) && (
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              placeholder="Search notifications by title, message, or type"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-full sm:w-48">
               <Filter className="h-4 w-4 mr-2" />
@@ -373,6 +407,25 @@ const NotificationsPage = () => {
               <SelectItem value="priority">High Priority First</SelectItem>
             </SelectContent>
           </Select>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setTypeFilter('all');
+                setSortOrder('newest');
+                setSearchQuery('');
+                setFilter('all');
+              }}
+              className="self-start"
+            >
+              Reset filters
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Showing {sorted.length} of {notifications.length} notifications
+          </p>
         </div>
       )}
 
@@ -394,7 +447,33 @@ const NotificationsPage = () => {
 
       <div className="space-y-3">
         {loading && <p className="text-sm text-muted-foreground">Loading notifications...</p>}
-        {!loading && sorted.length === 0 && <p className="text-sm text-muted-foreground">No notifications.</p>}
+        {!loading && sorted.length === 0 && (
+          <EmptyState
+            title="No notifications found"
+            description={
+              notifications.length > 0
+                ? 'Try adjusting filters or search to find what you need.'
+                : 'You are all caught up. New updates will appear here.'
+            }
+            action={
+              notifications.length > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setTypeFilter('all');
+                    setSortOrder('newest');
+                    setSearchQuery('');
+                    setFilter('all');
+                  }}
+                >
+                  Reset filters
+                </Button>
+              ) : undefined
+            }
+            className="py-10"
+          />
+        )}
         {(isAdmin || isTechnician) && !loading && sorted.length > 0 && (
           <div className="mb-3 flex items-center gap-3 px-3 py-2">
             <Checkbox
@@ -432,7 +511,7 @@ const NotificationsPage = () => {
               {(isAdmin || isTechnician) && (
                 <Button 
                   size="sm" 
-                  variant="default"
+                  variant="destructive"
                   onClick={(e) => deleteNotification(n.id, e)}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -473,6 +552,7 @@ const NotificationsPage = () => {
                 disabled={sendingBroadcast}
                 rows={4}
               />
+              <p className="text-xs text-muted-foreground">Keep it concise and action-focused for better engagement.</p>
             </div>
 
             <div className="space-y-3">
@@ -496,6 +576,10 @@ const NotificationsPage = () => {
                 ))}
               </div>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Audience selected: <span className="font-medium text-foreground">{broadcastRoles.length}</span>
+            </p>
           </div>
 
           <div className="flex justify-end gap-2">
