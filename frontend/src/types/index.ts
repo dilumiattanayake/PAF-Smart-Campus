@@ -82,7 +82,7 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'BOOKING_STATUS' | 'TICKET_ASSIGNED' | 'TICKET_STATUS' | 'COMMENT' | 'SYSTEM' | 'RESOURCE' | 'BOOKING' | 'TICKET';
+  type: 'BOOKING_STATUS' | 'TICKET_ASSIGNED' | 'TICKET_STATUS' | 'COMMENT' | 'SYSTEM' | 'RESOURCE' | 'BOOKING' | 'TICKET' | 'BROADCAST';
   isRead: boolean;
   referenceId?: string;
   createdAt: string;

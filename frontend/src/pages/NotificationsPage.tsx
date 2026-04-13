@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCheck, Trash2, Bell, AlertCircle, Calendar, Zap, Filter, ArrowUpDown, X } from 'lucide-react';
+import { CheckCheck, Trash2, Bell, AlertCircle, Calendar, Zap, Filter, ArrowUpDown, X, Send } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -18,6 +18,18 @@ import { notificationService } from '@/services/notificationService';
 import type { Notification } from '@/types';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { api } from '@/services/authService';
 
 const NotificationsPage = () => {
   const { toast } = useToast();
@@ -29,6 +41,12 @@ const NotificationsPage = () => {
   const [sortOrder, setSortOrder] = useState('newest');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastRoles, setBroadcastRoles] = useState<string[]>(['USER']);
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  
   const isAdmin = user?.role === 'ADMIN';
   const isTechnician = user?.role === 'TECHNICIAN';
 
@@ -46,6 +64,41 @@ const NotificationsPage = () => {
     load();
   }, []);
 
+  const handleSendBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastMessage.trim() || broadcastRoles.length === 0) {
+      toast({ title: 'Error', description: 'Please fill in all fields and select at least one role', variant: 'destructive' });
+      return;
+    }
+
+    setSendingBroadcast(true);
+    try {
+      const response = await api.post('/api/notifications/broadcast', {
+        title: broadcastTitle,
+        message: broadcastMessage,
+        targetRoles: broadcastRoles,
+      });
+
+      toast({ title: 'Success', description: `Broadcast sent to ${response.data.notificationsSent} user(s)` });
+      setShowBroadcastModal(false);
+      setBroadcastTitle('');
+      setBroadcastMessage('');
+      setBroadcastRoles(['USER']);
+      
+      // Reload notifications
+      await load();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to send broadcast notification', variant: 'destructive' });
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const toggleBroadcastRole = (role: string) => {
+    setBroadcastRoles(prev =>
+      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    );
+  };
+
   const filtered = filter === 'unread'
     ? notifications.filter(n => !n.isRead)
     : filter === 'read'
@@ -58,6 +111,7 @@ const NotificationsPage = () => {
         const baseType = n.type?.includes('BOOKING') ? 'BOOKING' :
                         n.type?.includes('TICKET') ? 'TICKET' :
                         n.type === 'COMMENT' ? 'COMMENT' :
+                        n.type === 'BROADCAST' ? 'BROADCAST' :
                         n.type === 'SYSTEM' ? 'SYSTEM' : 'OTHER';
         return baseType === typeFilter;
       });
@@ -194,6 +248,7 @@ const NotificationsPage = () => {
     TICKET_STATUS: '🔧',
     TICKET_ASSIGNED: '👷',
     COMMENT: '💬',
+    BROADCAST: '📢',
     SYSTEM: '⚙️',
     RESOURCE: '🏛️',
   };
@@ -252,6 +307,16 @@ const NotificationsPage = () => {
         description="Stay updated with all system activities and alerts"
         actions={
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button 
+                size="sm" 
+                variant="default" 
+                onClick={() => setShowBroadcastModal(true)}
+                className="gap-2"
+              >
+                <Send className="h-3 w-3" />Send Broadcast
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={markAllRead} disabled={!notifications.length}>
               <CheckCheck className="h-3 w-3 mr-1" />Mark all read
             </Button>
@@ -291,6 +356,7 @@ const NotificationsPage = () => {
               <SelectItem value="BOOKING">📅 Booking</SelectItem>
               <SelectItem value="TICKET">🔧 Ticket</SelectItem>
               <SelectItem value="COMMENT">💬 Comment</SelectItem>
+              <SelectItem value="BROADCAST">📢 Broadcast</SelectItem>
               <SelectItem value="SYSTEM">⚙️ System</SelectItem>
             </SelectContent>
           </Select>
@@ -376,6 +442,73 @@ const NotificationsPage = () => {
           </Card>
         ))}
       </div>
+
+      {/* Broadcast Notification Modal */}
+      <AlertDialog open={showBroadcastModal} onOpenChange={setShowBroadcastModal}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send Broadcast Notification</AlertDialogTitle>
+            <AlertDialogDescription>
+              Send a message to specific user roles across the system
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                placeholder="Notification title"
+                value={broadcastTitle}
+                onChange={(e) => setBroadcastTitle(e.target.value)}
+                disabled={sendingBroadcast}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Message</label>
+              <Textarea
+                placeholder="Notification message"
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                disabled={sendingBroadcast}
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Send to</label>
+              <div className="space-y-2 border rounded-lg p-3 bg-muted/50">
+                {['USER', 'TECHNICIAN', 'ADMIN'].map(role => (
+                  <div key={role} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`role-${role}`}
+                      checked={broadcastRoles.includes(role)}
+                      onCheckedChange={() => toggleBroadcastRole(role)}
+                      disabled={sendingBroadcast}
+                    />
+                    <label
+                      htmlFor={`role-${role}`}
+                      className="text-sm font-medium cursor-pointer flex-1"
+                    >
+                      {role === 'USER' ? 'All Users' : role === 'TECHNICIAN' ? 'Technicians' : 'Admins'}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <AlertDialogCancel disabled={sendingBroadcast}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSendBroadcast}
+              disabled={sendingBroadcast || !broadcastTitle.trim() || !broadcastMessage.trim()}
+            >
+              {sendingBroadcast ? 'Sending...' : 'Send'}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

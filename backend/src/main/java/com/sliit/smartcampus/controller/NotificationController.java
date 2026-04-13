@@ -1,5 +1,6 @@
 package com.sliit.smartcampus.controller;
 
+import com.sliit.smartcampus.dto.notification.BroadcastNotificationRequest;
 import com.sliit.smartcampus.dto.notification.NotificationCreateRequest;
 import com.sliit.smartcampus.dto.notification.NotificationResponse;
 import com.sliit.smartcampus.service.NotificationService;
@@ -56,6 +57,12 @@ public class NotificationController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<NotificationResponse> createNotification(@Valid @RequestBody NotificationCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(notificationService.createNotificationByAdmin(request));
+    }
+
+    @PostMapping("/broadcast")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> broadcastNotification(@Valid @RequestBody BroadcastNotificationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(notificationService.broadcastNotification(request));
     }
 
     @DeleteMapping("/{id}")

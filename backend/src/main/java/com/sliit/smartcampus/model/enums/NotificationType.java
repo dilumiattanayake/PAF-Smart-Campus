@@ -5,5 +5,6 @@ public enum NotificationType {
     TICKET,
     TICKET_ASSIGNED,
     TICKET_STATUS,
-    COMMENT
+    COMMENT,
+    BROADCAST
 }
