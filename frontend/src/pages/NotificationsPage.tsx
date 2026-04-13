@@ -308,6 +308,8 @@ const NotificationsPage = () => {
     return getTicketPriority(type);
   };
 
+  const getTypeLabel = (type: string) => type.replace(/_/g, ' ');
+
   const todayCount = notifications.filter(n => isToday(n.createdAt)).length;
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const highPriorityCount = notifications.filter(n => 
@@ -367,19 +369,18 @@ const NotificationsPage = () => {
         </Card>
       )}
 
-      {(isAdmin || isTechnician) && (
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input
-              placeholder="Search notifications by title, message, or type"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+          <Input
+            placeholder="Search notifications by title, message, or type"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-full sm:w-48">
               <Filter className="h-4 w-4 mr-2" />
@@ -421,13 +422,16 @@ const NotificationsPage = () => {
             >
               Reset filters
             </Button>
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            Showing {sorted.length} of {notifications.length} notifications
-          </p>
         </div>
-      )}
+
+        <p className="text-xs text-muted-foreground">
+          Showing {sorted.length} of {notifications.length} notifications
+        </p>
+
+        {!isAdmin && !isTechnician && (
+          <p className="text-xs text-muted-foreground">Tip: Click a notification to open the related booking or ticket.</p>
+        )}
+      </div>
 
       {(isAdmin || isTechnician) && selected.size > 0 && (
         <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
@@ -485,7 +489,7 @@ const NotificationsPage = () => {
           </div>
         )}
         {!loading && sorted.map(n => (
-          <Card key={n.id} className={`transition-colors ${!n.isRead ? 'border-primary/30 bg-primary/5' : ''} ${selected.has(n.id!) ? 'border-primary bg-primary/10' : 'cursor-pointer'}`}>
+          <Card key={n.id} className={`transition-colors ${!n.isRead ? 'border-primary/30 bg-primary/5' : ''} ${selected.has(n.id!) ? 'border-primary bg-primary/10' : 'cursor-pointer hover:border-primary/30'}`}>
             <CardContent className="flex items-start gap-3 py-4">
               {(isAdmin || isTechnician) && (
                 <Checkbox
@@ -503,11 +507,24 @@ const NotificationsPage = () => {
               <div className="flex-1 min-w-0" onClick={() => ((isAdmin || isTechnician) ? selected.size === 0 : true) && goToNotification(n)}>
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-semibold">{n.title}</h4>
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">{getTypeLabel(n.type)}</Badge>
                   {!n.isRead && <span className="h-2 w-2 rounded-full bg-primary" />}
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
                 <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
               </div>
+              {!isAdmin && !isTechnician && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToNotification(n);
+                  }}
+                >
+                  Open
+                </Button>
+              )}
               {(isAdmin || isTechnician) && (
                 <Button 
                   size="sm" 
