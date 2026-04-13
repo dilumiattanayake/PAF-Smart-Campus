@@ -128,7 +128,7 @@ const LoginPage = () => {
                   {isLoading ? 'Signing in...' : 'Sign in'}
                 </Button>
 
-                <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+                <Button type="button" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGoogleSignIn}>
                   <svg aria-hidden="true" viewBox="0 0 24 24" className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg">
                     <path fill="#EA4335" d="M12 10.2v3.92h5.45c-.24 1.26-.95 2.33-2.01 3.04l3.24 2.52c1.89-1.74 2.98-4.31 2.98-7.38 0-.71-.06-1.39-.18-2.04H12z" />
                     <path fill="#34A853" d="M12 22c2.7 0 4.96-.89 6.62-2.42l-3.24-2.52c-.9.6-2.05.96-3.38.96-2.59 0-4.79-1.75-5.58-4.1l-3.34 2.58C4.72 19.77 8.08 22 12 22z" />
