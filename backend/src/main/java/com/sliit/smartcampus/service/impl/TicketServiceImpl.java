@@ -11,11 +11,13 @@ import com.sliit.smartcampus.mapper.CommentMapper;
 import com.sliit.smartcampus.mapper.TicketMapper;
 import com.sliit.smartcampus.model.Comment;
 import com.sliit.smartcampus.model.Ticket;
+import com.sliit.smartcampus.model.User;
 import com.sliit.smartcampus.model.enums.NotificationType;
 import com.sliit.smartcampus.model.enums.Role;
 import com.sliit.smartcampus.model.enums.TicketStatus;
 import com.sliit.smartcampus.repository.CommentRepository;
 import com.sliit.smartcampus.repository.TicketRepository;
+import com.sliit.smartcampus.repository.UserRepository;
 import com.sliit.smartcampus.service.NotificationService;
 import com.sliit.smartcampus.service.TicketService;
 import com.sliit.smartcampus.util.SecurityUtils;
@@ -30,6 +32,7 @@ public class TicketServiceImpl implements TicketService {
 
     private final TicketRepository ticketRepository;
     private final CommentRepository commentRepository;
+    private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -42,6 +45,7 @@ public class TicketServiceImpl implements TicketService {
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
         Ticket ticket = TicketMapper.toEntity(request, userId);
         ticketRepository.save(ticket);
+        notifySupportStaffOnCreate(ticket, userId);
         return TicketMapper.toResponse(ticket, List.of());
     }
 
@@ -148,6 +152,35 @@ public class TicketServiceImpl implements TicketService {
                 .orElseThrow(() -> new ForbiddenException("Not authenticated"));
         if (role != Role.ADMIN) {
             throw new ForbiddenException("Admin privileges required");
+        }
+    }
+
+    private void notifySupportStaffOnCreate(Ticket ticket, String creatorId) {
+        List<User> technicians = userRepository.findByRole(Role.TECHNICIAN);
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+
+        for (User user : technicians) {
+            if (!user.getId().equals(creatorId)) {
+                notificationService.createNotification(
+                        user.getId(),
+                        "New ticket created",
+                        "A new ticket requires attention",
+                        NotificationType.TICKET,
+                        ticket.getId()
+                );
+            }
+        }
+
+        for (User user : admins) {
+            if (!user.getId().equals(creatorId)) {
+                notificationService.createNotification(
+                        user.getId(),
+                        "New ticket created",
+                        "A new ticket has been submitted",
+                        NotificationType.TICKET,
+                        ticket.getId()
+                );
+            }
         }
     }
 }
