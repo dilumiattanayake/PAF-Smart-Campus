@@ -1,11 +1,16 @@
 package com.sliit.smartcampus.service.impl;
 
+import com.sliit.smartcampus.dto.notification.BroadcastNotificationRequest;
+import com.sliit.smartcampus.dto.notification.NotificationCreateRequest;
 import com.sliit.smartcampus.dto.notification.NotificationResponse;
 import com.sliit.smartcampus.exception.ForbiddenException;
 import com.sliit.smartcampus.exception.ResourceNotFoundException;
 import com.sliit.smartcampus.model.Notification;
+import com.sliit.smartcampus.model.User;
 import com.sliit.smartcampus.model.enums.NotificationType;
+import com.sliit.smartcampus.model.enums.Role;
 import com.sliit.smartcampus.repository.NotificationRepository;
+import com.sliit.smartcampus.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +24,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,6 +41,9 @@ class NotificationServiceImplTest {
 
     @Mock
     private NotificationRepository notificationRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private NotificationServiceImpl notificationService;
@@ -133,6 +143,154 @@ class NotificationServiceImplTest {
         when(notificationRepository.findById("n1")).thenReturn(Optional.of(n));
 
         assertThrows(ForbiddenException.class, () -> notificationService.deleteNotification("n1"));
+    }
+
+    @Test
+    void deleteNotification_deletesNotification_whenOwnedByCurrentUser() {
+        Notification n = Notification.builder()
+                .id("n1")
+                .userId("user-1")
+                .build();
+
+        when(notificationRepository.findById("n1")).thenReturn(Optional.of(n));
+
+        notificationService.deleteNotification("n1");
+
+        verify(notificationRepository).deleteById("n1");
+    }
+
+    @Test
+    void markAllAsRead_marksAllCurrentUsersNotificationsAsRead() {
+        Notification n1 = Notification.builder()
+                .id("n1")
+                .userId("user-1")
+                .read(false)
+                .type(NotificationType.BOOKING_STATUS)
+                .build();
+        Notification n2 = Notification.builder()
+                .id("n2")
+                .userId("user-1")
+                .read(false)
+                .type(NotificationType.TICKET)
+                .build();
+
+        when(notificationRepository.findByUserIdOrderByCreatedAtDesc("user-1")).thenReturn(List.of(n1, n2));
+
+        notificationService.markAllAsRead();
+
+        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
+        verify(notificationRepository).saveAll(captor.capture());
+        List<Notification> saved = captor.getValue();
+
+        assertEquals(2, saved.size());
+        assertTrue(saved.get(0).isRead());
+        assertTrue(saved.get(1).isRead());
+    }
+
+    @Test
+    void deleteAllNotifications_deletesAllCurrentUsersNotifications() {
+        Notification n1 = Notification.builder()
+                .id("n1")
+                .userId("user-1")
+                .build();
+        Notification n2 = Notification.builder()
+                .id("n2")
+                .userId("user-1")
+                .build();
+
+        when(notificationRepository.findByUserIdOrderByCreatedAtDesc("user-1")).thenReturn(List.of(n1, n2));
+
+        notificationService.deleteAllNotifications();
+
+        verify(notificationRepository).deleteAll(List.of(n1, n2));
+    }
+
+    @Test
+    void createNotificationByAdmin_savesNotificationWithProvidedDetails() {
+        NotificationCreateRequest request = new NotificationCreateRequest();
+        request.setUserId("user-2");
+        request.setTitle("Manual notification");
+        request.setMessage("This is manually created");
+        request.setType(NotificationType.SYSTEM);
+        request.setReferenceId("ref-1");
+
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
+            Notification n = inv.getArgument(0);
+            n.setId("n-auto");
+            return n;
+        });
+
+        NotificationResponse response = notificationService.createNotificationByAdmin(request);
+
+        assertEquals("n-auto", response.getId());
+        assertEquals("user-2", response.getUserId());
+        assertEquals("Manual notification", response.getTitle());
+        assertEquals("This is manually created", response.getMessage());
+        assertEquals(NotificationType.SYSTEM, response.getType());
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        Notification saved = captor.getValue();
+        assertFalse(saved.isRead());
+    }
+
+    @Test
+    void broadcastNotification_createsNotificationsForAllUsersInTargetRoles() {
+        User user1 = User.builder().id("u1").role(Role.USER).build();
+        User user2 = User.builder().id("u2").role(Role.USER).build();
+        User tech1 = User.builder().id("t1").role(Role.TECHNICIAN).build();
+
+        when(userRepository.findByRole(Role.USER)).thenReturn(List.of(user1, user2));
+        when(userRepository.findByRole(Role.TECHNICIAN)).thenReturn(List.of(tech1));
+        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        BroadcastNotificationRequest request = new BroadcastNotificationRequest(
+                "System Maintenance",
+                "Scheduled maintenance at 2 AM",
+                List.of(Role.USER, Role.TECHNICIAN)
+        );
+
+        Map<String, Object> response = notificationService.broadcastNotification(request);
+
+        assertTrue((Boolean) response.get("success"));
+        assertEquals("Broadcast notification sent successfully", response.get("message"));
+        assertEquals(3, response.get("notificationsSent"));
+
+        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
+        verify(notificationRepository).saveAll(captor.capture());
+        List<Notification> notifications = captor.getValue();
+
+        assertEquals(3, notifications.size());
+        assertEquals(NotificationType.BROADCAST, notifications.get(0).getType());
+        assertTrue(notifications.stream().anyMatch(n -> n.getUserId().equals("u1")));
+        assertTrue(notifications.stream().anyMatch(n -> n.getUserId().equals("u2")));
+        assertTrue(notifications.stream().anyMatch(n -> n.getUserId().equals("t1")));
+    }
+
+    @Test
+    void broadcastNotification_createsNotificationsOnlyForAdmins_whenOnlyAdminRoleSelected() {
+        User admin1 = User.builder().id("a1").role(Role.ADMIN).build();
+        User admin2 = User.builder().id("a2").role(Role.ADMIN).build();
+
+        when(userRepository.findByRole(Role.ADMIN)).thenReturn(List.of(admin1, admin2));
+        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        BroadcastNotificationRequest request = new BroadcastNotificationRequest(
+                "Admin Alert",
+                "Important admin notification",
+                List.of(Role.ADMIN)
+        );
+
+        Map<String, Object> response = notificationService.broadcastNotification(request);
+
+        assertEquals(2, response.get("notificationsSent"));
+
+        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
+        verify(notificationRepository).saveAll(captor.capture());
+        List<Notification> notifications = captor.getValue();
+
+        assertEquals(2, notifications.size());
+        assertTrue(notifications.stream().allMatch(n -> n.getUserId().equals("a1") || n.getUserId().equals("a2")));
     }
 
     @Test
