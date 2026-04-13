@@ -23,6 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -176,11 +177,15 @@ class NotificationServiceImplTest {
 
         when(notificationRepository.findByUserIdOrderByCreatedAtDesc("user-1")).thenReturn(List.of(n1, n2));
 
-        notificationService.markAllAsRead();
+        List<Notification> saved = new ArrayList<>();
+        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<Notification> list = inv.getArgument(0);
+            saved.clear();
+            saved.addAll(list);
+            return list;
+        });
 
-        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
-        verify(notificationRepository).saveAll(captor.capture());
-        List<Notification> saved = captor.getValue();
+        notificationService.markAllAsRead();
 
         assertEquals(2, saved.size());
         assertTrue(saved.get(0).isRead());
@@ -211,7 +216,7 @@ class NotificationServiceImplTest {
         request.setUserId("user-2");
         request.setTitle("Manual notification");
         request.setMessage("This is manually created");
-        request.setType(NotificationType.SYSTEM);
+        request.setType(NotificationType.BROADCAST);
         request.setReferenceId("ref-1");
 
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
@@ -226,7 +231,7 @@ class NotificationServiceImplTest {
         assertEquals("user-2", response.getUserId());
         assertEquals("Manual notification", response.getTitle());
         assertEquals("This is manually created", response.getMessage());
-        assertEquals(NotificationType.SYSTEM, response.getType());
+        assertEquals(NotificationType.BROADCAST, response.getType());
 
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());
@@ -239,10 +244,16 @@ class NotificationServiceImplTest {
         User user1 = User.builder().id("u1").role(Role.USER).build();
         User user2 = User.builder().id("u2").role(Role.USER).build();
         User tech1 = User.builder().id("t1").role(Role.TECHNICIAN).build();
+        List<Notification> notifications = new ArrayList<>();
 
         when(userRepository.findByRole(Role.USER)).thenReturn(List.of(user1, user2));
         when(userRepository.findByRole(Role.TECHNICIAN)).thenReturn(List.of(tech1));
-        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<Notification> list = inv.getArgument(0);
+            notifications.clear();
+            notifications.addAll(list);
+            return list;
+        });
 
         BroadcastNotificationRequest request = new BroadcastNotificationRequest(
                 "System Maintenance",
@@ -256,10 +267,6 @@ class NotificationServiceImplTest {
         assertEquals("Broadcast notification sent successfully", response.get("message"));
         assertEquals(3, response.get("notificationsSent"));
 
-        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
-        verify(notificationRepository).saveAll(captor.capture());
-        List<Notification> notifications = captor.getValue();
-
         assertEquals(3, notifications.size());
         assertEquals(NotificationType.BROADCAST, notifications.get(0).getType());
         assertTrue(notifications.stream().anyMatch(n -> n.getUserId().equals("u1")));
@@ -271,9 +278,15 @@ class NotificationServiceImplTest {
     void broadcastNotification_createsNotificationsOnlyForAdmins_whenOnlyAdminRoleSelected() {
         User admin1 = User.builder().id("a1").role(Role.ADMIN).build();
         User admin2 = User.builder().id("a2").role(Role.ADMIN).build();
+        List<Notification> notifications = new ArrayList<>();
 
         when(userRepository.findByRole(Role.ADMIN)).thenReturn(List.of(admin1, admin2));
-        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<Notification> list = inv.getArgument(0);
+            notifications.clear();
+            notifications.addAll(list);
+            return list;
+        });
 
         BroadcastNotificationRequest request = new BroadcastNotificationRequest(
                 "Admin Alert",
@@ -284,10 +297,6 @@ class NotificationServiceImplTest {
         Map<String, Object> response = notificationService.broadcastNotification(request);
 
         assertEquals(2, response.get("notificationsSent"));
-
-        ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
-        verify(notificationRepository).saveAll(captor.capture());
-        List<Notification> notifications = captor.getValue();
 
         assertEquals(2, notifications.size());
         assertTrue(notifications.stream().allMatch(n -> n.getUserId().equals("a1") || n.getUserId().equals("a2")));
