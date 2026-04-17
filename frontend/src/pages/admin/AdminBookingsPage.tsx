@@ -42,18 +42,40 @@ const AdminBookingsPage = () => {
   }, []);
 
   const approve = async (id: string) => {
-    await bookingService.approve(id);
-    toast({ title: 'Booking approved' });
-    load(statusFilter);
+    try {
+      await bookingService.approve(id);
+      toast({ title: 'Booking approved' });
+    } catch (err: any) {
+      const conflict = err?.response?.status === 409;
+      const message = err?.response?.data?.message as string | undefined;
+      toast({
+        title: conflict ? 'Cannot approve booking' : 'Unable to approve booking',
+        description: conflict ? (message || 'This time range conflicts with another booking.') : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      load(statusFilter);
+    }
   };
 
   const reject = async () => {
     if (!decisionId) return;
-    await bookingService.reject(decisionId, reason || 'Rejected');
-    toast({ title: 'Booking rejected' });
-    setReason('');
-    setDecisionId(null);
-    load(statusFilter);
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      toast({ title: 'Rejection reason is required', variant: 'destructive' });
+      return;
+    }
+    try {
+      await bookingService.reject(decisionId, trimmed);
+      toast({ title: 'Booking rejected' });
+      setReason('');
+      setDecisionId(null);
+    } catch (err: any) {
+      const message = err?.response?.data?.message as string | undefined;
+      toast({ title: 'Unable to reject booking', description: message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      load(statusFilter);
+    }
   };
 
   return (
