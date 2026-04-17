@@ -55,8 +55,14 @@ export const AdminDashboard = () => {
       await bookingService.approve(id);
       toast({ title: 'Booking approved' });
       await reloadBookings();
-    } catch {
-      toast({ title: 'Unable to approve booking', variant: 'destructive' });
+    } catch (err: any) {
+      const conflict = err?.response?.status === 409;
+      const message = err?.response?.data?.message as string | undefined;
+      toast({
+        title: conflict ? 'Cannot approve booking' : 'Unable to approve booking',
+        description: conflict ? (message || 'This time range conflicts with another booking.') : 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setActingId(null);
     }
@@ -77,8 +83,9 @@ export const AdminDashboard = () => {
       setReason('');
       setDecisionId(null);
       await reloadBookings();
-    } catch {
-      toast({ title: 'Unable to reject booking', variant: 'destructive' });
+    } catch (err: any) {
+      const message = err?.response?.data?.message as string | undefined;
+      toast({ title: 'Unable to reject booking', description: message || 'Please try again.', variant: 'destructive' });
     } finally {
       setActingId(null);
     }
