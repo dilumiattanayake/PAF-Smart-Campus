@@ -15,11 +15,12 @@ Thumbs.db
 node_modules/
 **/node_modules/
 **/dist/
-.vite/
-.vitest/
-coverage/
-playwright-report/
-test-results/
+**/.vite/
+**/.vitest/
+**/coverage/
+**/playwright-report/
+**/test-results/
+.eslintcache
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
