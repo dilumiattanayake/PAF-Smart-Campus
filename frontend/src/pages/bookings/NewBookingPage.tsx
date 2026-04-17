@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AlertCircle } from 'lucide-react';
 import { resourceService } from '@/services/resourceService';
 import { bookingService } from '@/services/bookingService';
-import type { Resource } from '@/types';
+import type { Booking, Resource } from '@/types';
 import { useEffect } from 'react';
 
 type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
@@ -81,11 +81,50 @@ const NewBookingPage = () => {
     return Object.keys(e).length === 0;
   };
 
+  const toMinutes = (t: string) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(t);
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    return hh * 60 + mm;
+  };
+
+  const overlaps = (start1: string, end1: string, start2: string, end2: string) => {
+    const s1 = toMinutes(start1);
+    const e1 = toMinutes(end1);
+    const s2 = toMinutes(start2);
+    const e2 = toMinutes(end2);
+    if (s1 == null || e1 == null || s2 == null || e2 == null) return false;
+    return s1 < e2 && e1 > s2;
+  };
+
+  const findUserTimeConflict = (all: Booking[], date: string, startTime: string, endTime: string, ignoreId?: string | null) => {
+    return all.find(b =>
+      b.id !== ignoreId &&
+      b.bookingDate === date &&
+      (b.status === 'PENDING' || b.status === 'APPROVED') &&
+      overlaps(startTime, endTime, b.startTime, b.endTime)
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
     try {
+      // Client-side guard: avoid letting a USER double-book themselves.
+      if (user?.role === 'USER') {
+        const mine = await bookingService.getMyBookings();
+        const conflict = findUserTimeConflict(mine, form.bookingDate, form.startTime, form.endTime, editId);
+        if (conflict) {
+          const msg = `You already have a booking for ${conflict.resourceName || conflict.resourceId} on ${conflict.bookingDate} (${conflict.startTime}–${conflict.endTime}).`;
+          setErrors(prev => ({ ...prev, startTime: msg, endTime: msg }));
+          toast({ title: 'Time conflict', description: msg, variant: 'destructive' });
+          return;
+        }
+      }
+
       const payload = {
         resourceId: form.resourceId,
         purpose: form.purpose,
@@ -105,9 +144,10 @@ const NewBookingPage = () => {
       navigate('/bookings');
     } catch (err: any) {
       const conflict = err?.response?.status === 409;
+      const serverMessage = err?.response?.data?.message as string | undefined;
       toast({
-        title: conflict ? 'Time clash detected' : 'Unable to save booking',
-        description: conflict ? 'This slot is already booked for the selected resource.' : 'Please try again or contact admin.',
+        title: conflict ? 'Time conflict detected' : 'Unable to save booking',
+        description: conflict ? (serverMessage || 'This time range conflicts with an existing booking.') : 'Please try again or contact admin.',
         variant: 'destructive',
       });
     } finally {
