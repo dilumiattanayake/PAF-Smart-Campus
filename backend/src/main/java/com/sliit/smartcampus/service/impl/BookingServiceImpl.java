@@ -59,6 +59,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setRequesterEmail(user.getEmail());
 
         ensureNoConflict(booking, null);
+        ensureNoUserConflict(booking, null);
         bookingRepository.save(booking);
         return toResponseWithNames(booking);
     }
@@ -119,6 +120,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setApprovedBy(SecurityUtils.getCurrentUserId().orElse(null));
         booking.setRejectionReason(null);
         ensureNoConflict(booking, id);
+        ensureNoUserConflict(booking, id);
         bookingRepository.save(booking);
         notificationService.createNotification(booking.getUserId(), "Booking approved",
                 "Your booking has been approved.", NotificationType.BOOKING_STATUS, booking.getId());
@@ -181,14 +183,16 @@ public class BookingServiceImpl implements BookingService {
         }
         var resource = resourceRepository.findById(request.getResourceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
-        ensureNoConflict(Booking.builder()
-                        .id(id)
-                        .resourceId(request.getResourceId())
-                        .bookingDate(request.getBookingDate())
-                        .startTime(request.getStartTime())
-                        .endTime(request.getEndTime())
-                        .build(),
-                id);
+        Booking proposed = Booking.builder()
+                .id(id)
+                .userId(booking.getUserId())
+                .resourceId(request.getResourceId())
+                .bookingDate(request.getBookingDate())
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .build();
+        ensureNoConflict(proposed, id);
+        ensureNoUserConflict(proposed, id);
 
         booking.setResourceId(request.getResourceId());
         booking.setPurpose(request.getPurpose());
@@ -206,6 +210,27 @@ public class BookingServiceImpl implements BookingService {
         List<Booking> conflicts = bookingRepository.findByResourceIdAndBookingDateAndStatusIn(
                 booking.getResourceId(),
                 booking.getBookingDate(),
+                // Allow multiple pending requests for the same slot; only block once a booking is approved.
+                EnumSet.of(BookingStatus.APPROVED)
+        );
+        LocalTime newStart = booking.getStartTime();
+        LocalTime newEnd = booking.getEndTime();
+        for (Booking existing : conflicts) {
+            if (currentBookingId != null && existing.getId().equals(currentBookingId)) {
+                continue;
+            }
+            if (timesOverlap(newStart, newEnd, existing.getStartTime(), existing.getEndTime())) {
+                throw new ConflictException("Time conflict: resource is already booked on " + booking.getBookingDate()
+                        + " (" + existing.getStartTime() + "-" + existing.getEndTime() + ").");
+            }
+        }
+    }
+
+    private void ensureNoUserConflict(Booking booking, String currentBookingId) {
+        if (booking.getUserId() == null || booking.getUserId().isBlank()) return;
+        List<Booking> conflicts = bookingRepository.findByUserIdAndBookingDateAndStatusIn(
+                booking.getUserId(),
+                booking.getBookingDate(),
                 EnumSet.of(BookingStatus.PENDING, BookingStatus.APPROVED)
         );
         LocalTime newStart = booking.getStartTime();
@@ -215,7 +240,11 @@ public class BookingServiceImpl implements BookingService {
                 continue;
             }
             if (timesOverlap(newStart, newEnd, existing.getStartTime(), existing.getEndTime())) {
-                throw new ConflictException("Booking time conflicts with existing booking");
+                String resourceLabel = existing.getResourceName() != null && !existing.getResourceName().isBlank()
+                        ? existing.getResourceName()
+                        : existing.getResourceId();
+                throw new ConflictException("Time conflict: requester already has a booking for " + resourceLabel + " on "
+                        + booking.getBookingDate() + " (" + existing.getStartTime() + "-" + existing.getEndTime() + ").");
             }
         }
     }
