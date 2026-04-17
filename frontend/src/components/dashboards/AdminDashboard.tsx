@@ -11,6 +11,9 @@ import { resourceService } from '@/services/resourceService';
 import { bookingService } from '@/services/bookingService';
 import type { Booking, Resource } from '@/types';
 import { BookingCalendar } from '@/components/bookings/BookingCalendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 const resourceUsage = [
   { name: 'Lecture Halls', usage: 85 },
@@ -23,20 +26,63 @@ const resourceUsage = [
 const COLORS = ['hsl(210, 70%, 50%)', 'hsl(38, 92%, 50%)', 'hsl(152, 60%, 38%)', 'hsl(215, 12%, 50%)'];
 
 export const AdminDashboard = () => {
+  const { toast } = useToast();
   const [resources, setResources] = useState<Resource[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const pendingBookings = bookings.filter(b => b.status === 'PENDING');
+  const [decisionId, setDecisionId] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [actingId, setActingId] = useState<string | null>(null);
+
+  const reloadBookings = async () => {
+    const bks = await bookingService.getAll();
+    setBookings(bks);
+  };
 
   useEffect(() => {
     (async () => {
       const res = await resourceService.getAll();
       setResources(res);
-      const bks = await bookingService.getAll();
-      setBookings(bks);
+      await reloadBookings();
     })();
   }, []);
 
   const ticketByStatus = []; // placeholder if ticket API needed later
+
+  const approveBooking = async (id: string) => {
+    setActingId(id);
+    try {
+      await bookingService.approve(id);
+      toast({ title: 'Booking approved' });
+      await reloadBookings();
+    } catch {
+      toast({ title: 'Unable to approve booking', variant: 'destructive' });
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const rejectBooking = async () => {
+    if (!decisionId) return;
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      toast({ title: 'Rejection reason is required', variant: 'destructive' });
+      return;
+    }
+
+    setActingId(decisionId);
+    try {
+      await bookingService.reject(decisionId, trimmed);
+      toast({ title: 'Booking rejected' });
+      setReason('');
+      setDecisionId(null);
+      await reloadBookings();
+    } catch {
+      toast({ title: 'Unable to reject booking', variant: 'destructive' });
+    } finally {
+      setActingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -84,8 +130,34 @@ export const AdminDashboard = () => {
                     <p className="text-xs text-muted-foreground">{b.requesterName} • {b.bookingDate} {b.startTime}–{b.endTime}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="text-success border-success/30 hover:bg-success/10">Approve</Button>
-                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10">Reject</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-success border-success/30 hover:bg-success/10"
+                      disabled={actingId === b.id}
+                      onClick={() => approveBooking(b.id)}
+                    >
+                      Approve
+                    </Button>
+                    <Dialog open={decisionId === b.id} onOpenChange={open => setDecisionId(open ? b.id : null)}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                          disabled={actingId === b.id}
+                        >
+                          Reject
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>Reject Booking {b.id}</DialogTitle></DialogHeader>
+                        <Textarea placeholder="Reason for rejection" value={reason} onChange={e => setReason(e.target.value)} />
+                        <Button onClick={rejectBooking} className="bg-destructive text-destructive-foreground" disabled={actingId === b.id}>
+                          Confirm Rejection
+                        </Button>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               ))}
