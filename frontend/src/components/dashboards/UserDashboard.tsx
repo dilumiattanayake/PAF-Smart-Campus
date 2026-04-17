@@ -1,4 +1,4 @@
-import { CalendarDays, Wrench, CheckCircle, Bell, Plus, ArrowRight } from 'lucide-react';
+import { CalendarDays, CheckCircle, Bell, Plus, ArrowRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { StatCard } from '@/components/shared/StatCard';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -29,7 +29,12 @@ export const UserDashboard = () => {
   }, []);
 
   const unread = notifications.filter(n => !n.isRead).length;
-  const myTickets: any[] = [];
+  const recentNotifications = useMemo(
+    () => [...notifications]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3),
+    [notifications],
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -59,6 +64,11 @@ export const UserDashboard = () => {
                 <div>
                   <p className="text-sm font-medium">{b.resourceName}</p>
                   <p className="text-xs text-muted-foreground">{b.bookingDate} • {b.startTime}–{b.endTime}</p>
+                  {b.status === 'REJECTED' && b.rejectionReason && (
+                    <p className="text-xs text-destructive mt-1 line-clamp-2">
+                      Rejected: {b.rejectionReason}
+                    </p>
+                  )}
                 </div>
                 <StatusBadge status={b.status} />
               </Link>
@@ -66,23 +76,22 @@ export const UserDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Recent Tickets */}
+        {/* Recent Notifications */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Recent Ticket Activity</CardTitle>
-            <Link to="/tickets"><Button variant="ghost" size="sm">View all <ArrowRight className="h-3 w-3 ml-1" /></Button></Link>
+            <CardTitle className="text-base">Recent Notifications</CardTitle>
+            <Link to="/notifications"><Button variant="ghost" size="sm">View all <ArrowRight className="h-3 w-3 ml-1" /></Button></Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            {myTickets.slice(0, 3).map(t => (
-              <Link key={t.id} to={`/tickets/${t.id}`} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors">
-                <div>
-                  <p className="text-sm font-medium">{t.title}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{t.id} • {t.category}</p>
+            {recentNotifications.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No notifications yet.</p>
+            ) : recentNotifications.map(n => (
+              <Link key={n.id} to="/notifications" className="flex items-start justify-between gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{n.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                 </div>
-                <div className="flex gap-2">
-                  <StatusBadge status={t.priority} />
-                  <StatusBadge status={t.status} />
-                </div>
+                {!n.isRead && <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />}
               </Link>
             ))}
           </CardContent>
