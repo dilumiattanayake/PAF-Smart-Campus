@@ -1,5 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
-import { mockBookings } from '@/data/mockData';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,13 +7,57 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, CalendarDays, Clock, Users, Mail, FileText } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
+import { bookingService } from '@/services/bookingService';
+import type { Booking } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 const BookingDetailPage = () => {
   const { id } = useParams();
   const { user } = useAuth();
-  const booking = mockBookings.find(b => b.id === id);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
-  if (!booking) return <EmptyState title="Booking not found" action={<Link to="/bookings"><Button variant="outline"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button></Link>} />;
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    setNotFound(false);
+    setBooking(null);
+    (async () => {
+      try {
+        const b = await bookingService.getById(id);
+        if (!b) setNotFound(true);
+        else setBooking(b);
+      } catch (err: any) {
+        const status = err?.response?.status;
+        setNotFound(status === 404);
+        if (status && status !== 404) {
+          toast({ title: 'Unable to load booking', variant: 'destructive' });
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id, toast]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in max-w-3xl">
+        <p className="text-sm text-muted-foreground">Loading booking...</p>
+      </div>
+    );
+  }
+
+  if (notFound || !booking) {
+    return (
+      <EmptyState
+        title="Booking not found"
+        action={<Link to="/bookings"><Button variant="outline"><ArrowLeft className="h-4 w-4 mr-1" />Back</Button></Link>}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
@@ -26,14 +70,24 @@ const BookingDetailPage = () => {
         title={booking.purpose}
         actions={
           <div className="flex gap-2">
-            {booking.status === 'PENDING' && user?.role === 'ADMIN' && (
-              <>
-                <Button size="sm" className="bg-success hover:bg-success/90 text-success-foreground">Approve</Button>
-                <Button size="sm" variant="outline" className="text-destructive">Reject</Button>
-              </>
-            )}
             {booking.status === 'PENDING' && booking.requesterEmail === user?.email && (
-              <Button size="sm" variant="outline" className="text-destructive">Cancel</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive"
+                onClick={async () => {
+                  try {
+                    await bookingService.cancel(booking.id);
+                    toast({ title: 'Booking cancelled' });
+                    navigate(-1);
+                  } catch (err: any) {
+                    const message = err?.response?.data?.message as string | undefined;
+                    toast({ title: 'Unable to cancel booking', description: message || 'Please try again.', variant: 'destructive' });
+                  }
+                }}
+              >
+                Cancel
+              </Button>
             )}
           </div>
         }
