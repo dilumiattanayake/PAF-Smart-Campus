@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card } from '@/components/ui/card';
@@ -7,39 +7,81 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { bookingService } from '@/services/bookingService';
 import { resourceService } from '@/services/resourceService';
-import type { Booking } from '@/types';
+import type { Booking, Resource } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { BookingCalendar } from '@/components/bookings/BookingCalendar';
+
+type BookingFilters = { status?: string; resourceId?: string; userId?: string; dateFrom?: string; dateTo?: string };
 
 const AdminBookingsPage = () => {
   const { toast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [resourceMap, setResourceMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [resourceFilter, setResourceFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [decisionId, setDecisionId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
-  const load = async (status?: string) => {
+  const load = useCallback(async (filters?: BookingFilters) => {
     setLoading(true);
     try {
-      const data = await bookingService.getAll(status && status !== 'all' ? { status } : undefined);
+      const data = await bookingService.getAll(filters);
       setBookings(data);
+    } catch (err: any) {
+      const message = err?.response?.data?.message as string | undefined;
+      toast({ title: 'Unable to load bookings', description: message || 'Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
-    load();
     resourceService.getAll().then(res => {
+      setResources(res);
       const map: Record<string, string> = {};
       res.forEach(r => { map[r.id] = r.name; });
       setResourceMap(map);
     });
   }, []);
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setResourceFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const dateRangeInvalid = useMemo(() => dateFrom && dateTo && dateFrom > dateTo, [dateFrom, dateTo]);
+  const prevDateRangeInvalid = useRef(false);
+
+  useEffect(() => {
+    if (dateRangeInvalid && !prevDateRangeInvalid.current) {
+      toast({ title: 'Invalid date range', description: 'Start date must be before end date.', variant: 'destructive' });
+    }
+    prevDateRangeInvalid.current = !!dateRangeInvalid;
+  }, [dateRangeInvalid, toast]);
+
+  const activeFilters = useMemo((): BookingFilters | undefined => {
+    if (dateRangeInvalid) return undefined;
+    const next: BookingFilters = {};
+    if (statusFilter !== 'all') next.status = statusFilter;
+    if (resourceFilter !== 'all') next.resourceId = resourceFilter;
+    if (dateFrom) next.dateFrom = dateFrom;
+    if (dateTo) next.dateTo = dateTo;
+    return Object.keys(next).length ? next : undefined;
+  }, [dateFrom, dateRangeInvalid, dateTo, resourceFilter, statusFilter]);
+
+  useEffect(() => {
+    if (dateRangeInvalid) return;
+    load(activeFilters);
+  }, [activeFilters, dateRangeInvalid, load]);
 
   const approve = async (id: string) => {
     try {
@@ -54,7 +96,7 @@ const AdminBookingsPage = () => {
         variant: 'destructive',
       });
     } finally {
-      load(statusFilter);
+      load(activeFilters);
     }
   };
 
@@ -74,7 +116,7 @@ const AdminBookingsPage = () => {
       const message = err?.response?.data?.message as string | undefined;
       toast({ title: 'Unable to reject booking', description: message || 'Please try again.', variant: 'destructive' });
     } finally {
-      load(statusFilter);
+      load(activeFilters);
     }
   };
 
@@ -82,17 +124,36 @@ const AdminBookingsPage = () => {
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="Manage Bookings" description="Review and approve booking requests" />
 
-      <div className="flex items-center gap-3">
-        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); load(v); }}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="APPROVED">Approved</SelectItem>
-            <SelectItem value="REJECTED">Rejected</SelectItem>
-            <SelectItem value="CANCELLED">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
+              <SelectItem value="CANCELLED">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={resourceFilter} onValueChange={setResourceFilter}>
+            <SelectTrigger className="w-56"><SelectValue placeholder="Resource" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All resources</SelectItem>
+              {resources.map(r => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Input className="w-44" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <Input className="w-44" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" onClick={clearFilters}>Clear</Button>
+        </div>
       </div>
 
       <Card>
@@ -125,7 +186,7 @@ const AdminBookingsPage = () => {
                       {b.status === 'PENDING' ? (
                         <div className="flex gap-1">
                           <Button size="sm" variant="outline" className="text-success h-7 text-xs" onClick={() => approve(b.id)}>Approve</Button>
-                          <Dialog open={decisionId === b.id} onOpenChange={open => setDecisionId(open ? b.id : null)}>
+                          <Dialog open={decisionId === b.id} onOpenChange={open => { setDecisionId(open ? b.id : null); if (!open) setReason(''); }}>
                             <DialogTrigger asChild><Button size="sm" variant="outline" className="text-destructive h-7 text-xs">Reject</Button></DialogTrigger>
                             <DialogContent>
                               <DialogHeader><DialogTitle>Reject Booking {b.id}</DialogTitle></DialogHeader>
@@ -134,6 +195,17 @@ const AdminBookingsPage = () => {
                             </DialogContent>
                           </Dialog>
                         </div>
+                      ) : b.status === 'APPROVED' ? (
+                        <Dialog open={decisionId === b.id} onOpenChange={open => { setDecisionId(open ? b.id : null); if (!open) setReason(''); }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="text-destructive h-7 text-xs">Reject</Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader><DialogTitle>Reject Booking {b.id}</DialogTitle></DialogHeader>
+                            <Textarea placeholder="Reason for rejection" value={reason} onChange={e => setReason(e.target.value)} />
+                            <Button onClick={reject} className="bg-destructive text-destructive-foreground">Confirm Rejection</Button>
+                          </DialogContent>
+                        </Dialog>
                       ) : (
                         <StatusBadge status={b.status} />
                       )}
