@@ -90,8 +90,8 @@ public class BookingServiceImpl implements BookingService {
                 .filter(b -> filterStatus == null || b.getStatus() == filterStatus)
                 .filter(b -> resourceId == null || resourceId.isBlank() || Objects.equals(b.getResourceId(), resourceId))
                 .filter(b -> userId == null || userId.isBlank() || Objects.equals(b.getUserId(), userId))
-                .filter(b -> from == null || !b.getBookingDate().isBefore(from))
-                .filter(b -> to == null || !b.getBookingDate().isAfter(to))
+                .filter(b -> from == null || (b.getBookingDate() != null && !b.getBookingDate().isBefore(from)))
+                .filter(b -> to == null || (b.getBookingDate() != null && !b.getBookingDate().isAfter(to)))
                 .map(this::toResponseWithNames)
                 .collect(Collectors.toList());
     }
@@ -135,15 +135,24 @@ public class BookingServiceImpl implements BookingService {
         }
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
-        if (booking.getStatus() != BookingStatus.PENDING) {
-            throw new ConflictException("Only pending bookings can be rejected");
+        BookingStatus previousStatus = booking.getStatus();
+        if (previousStatus != BookingStatus.PENDING && previousStatus != BookingStatus.APPROVED) {
+            throw new ConflictException("Only pending or approved bookings can be rejected");
         }
         booking.setStatus(BookingStatus.REJECTED);
         booking.setRejectionReason(request.getRejectionReason());
         booking.setApprovedBy(SecurityUtils.getCurrentUserId().orElse(null));
         bookingRepository.save(booking);
-        notificationService.createNotification(booking.getUserId(), "Booking rejected",
-                "Booking rejected: " + request.getRejectionReason(), NotificationType.BOOKING_STATUS, booking.getId());
+        String title;
+        String message;
+        if (previousStatus == BookingStatus.APPROVED) {
+            title = "Approved booking rejected";
+            message = "Your booking was approved earlier, but an admin has now rejected it. Reason: " + request.getRejectionReason();
+        } else {
+            title = "Booking rejected";
+            message = "Your booking request has been rejected. Reason: " + request.getRejectionReason();
+        }
+        notificationService.createNotification(booking.getUserId(), title, message, NotificationType.BOOKING_STATUS, booking.getId());
         return toResponseWithNames(booking);
     }
 
