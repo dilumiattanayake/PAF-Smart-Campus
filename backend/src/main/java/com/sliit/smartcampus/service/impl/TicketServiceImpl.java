@@ -33,6 +33,7 @@ public class TicketServiceImpl implements TicketService {
     private final TicketRepository ticketRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
+    private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -45,7 +46,8 @@ public class TicketServiceImpl implements TicketService {
         String userId = SecurityUtils.getCurrentUserId().orElseThrow();
         Ticket ticket = TicketMapper.toEntity(request, userId);
         ticketRepository.save(ticket);
-        return TicketMapper.toResponse(ticket, List.of(), resolveUserName(ticket.getCreatedByUserId()));
+        notifySupportStaffOnCreate(ticket, userId);
+        return TicketMapper.toResponse(ticket, List.of());
     }
 
     @Override
@@ -162,6 +164,35 @@ public class TicketServiceImpl implements TicketService {
                 .orElseThrow(() -> new ForbiddenException("Not authenticated"));
         if (role != Role.ADMIN) {
             throw new ForbiddenException("Admin privileges required");
+        }
+    }
+
+    private void notifySupportStaffOnCreate(Ticket ticket, String creatorId) {
+        List<User> technicians = userRepository.findByRole(Role.TECHNICIAN);
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+
+        for (User user : technicians) {
+            if (!user.getId().equals(creatorId)) {
+                notificationService.createNotification(
+                        user.getId(),
+                        "New ticket created",
+                        "A new ticket requires attention",
+                        NotificationType.TICKET,
+                        ticket.getId()
+                );
+            }
+        }
+
+        for (User user : admins) {
+            if (!user.getId().equals(creatorId)) {
+                notificationService.createNotification(
+                        user.getId(),
+                        "New ticket created",
+                        "A new ticket has been submitted",
+                        NotificationType.TICKET,
+                        ticket.getId()
+                );
+            }
         }
     }
 }

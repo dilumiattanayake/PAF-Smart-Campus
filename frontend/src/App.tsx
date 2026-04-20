@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
+import OAuth2CallbackPage from "@/pages/auth/OAuth2CallbackPage";
 import DashboardPage from "@/pages/DashboardPage";
 import ResourceListPage from "@/pages/resources/ResourceListPage";
 import ResourceDetailPage from "@/pages/resources/ResourceDetailPage";
@@ -47,6 +48,7 @@ const AppRoutes = () => (
     <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
     <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
     <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+    <Route path="/oauth2/callback" element={<PublicRoute><OAuth2CallbackPage /></PublicRoute>} />
 
     <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
       <Route path="/dashboard" element={<DashboardPage />} />
