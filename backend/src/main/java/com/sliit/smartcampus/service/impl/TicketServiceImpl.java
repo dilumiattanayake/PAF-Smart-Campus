@@ -33,7 +33,6 @@ public class TicketServiceImpl implements TicketService {
     private final TicketRepository ticketRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
-    private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     @Override
