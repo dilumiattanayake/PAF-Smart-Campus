@@ -128,6 +128,15 @@ const LoginPage = () => {
                   {isLoading ? 'Signing in...' : 'Sign in'}
                 </Button>
 
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or</span>
+                  </div>
+                </div>
+
                 <Button type="button" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGoogleSignIn}>
                   <svg aria-hidden="true" viewBox="0 0 24 24" className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg">
                     <path fill="#FFFFFF" d="M12 10.2v3.92h5.45c-.24 1.26-.95 2.33-2.01 3.04l3.24 2.52c1.89-1.74 2.98-4.31 2.98-7.38 0-.71-.06-1.39-.18-2.04H12z" />
