@@ -66,6 +66,14 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             throw new OAuth2AuthenticationException(new OAuth2Error("db_write_error"), "Database write error during OAuth: " + e.getMessage());
         }
 
+        if (user.getRole() != Role.USER) {
+            log.warn("Blocked Google sign-in for non-student role: {} ({})", user.getRole(), user.getEmail());
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("oauth_role_not_allowed"),
+                    "Google Sign-In is allowed for students only"
+            );
+        }
+
         return new DefaultOAuth2User(
                 List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())),
                 attributes,
