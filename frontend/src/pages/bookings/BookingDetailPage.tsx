@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CalendarDays, Clock, Users, Mail, FileText } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Users, Mail, FileText, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { bookingService } from '@/services/bookingService';
@@ -89,6 +89,26 @@ const BookingDetailPage = () => {
                 Cancel
               </Button>
             )}
+                      {(booking.status === 'APPROVED' || booking.status === 'REJECTED') && booking.requesterEmail === user?.email && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={async () => {
+                            try {
+                              await bookingService.delete(booking.id);
+                              toast({ title: 'Booking deleted' });
+                              navigate(-1);
+                            } catch (err: any) {
+                              const message = err?.response?.data?.message as string | undefined;
+                              toast({ title: 'Unable to delete booking', description: message || 'Please try again.', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      )}
           </div>
         }
       />

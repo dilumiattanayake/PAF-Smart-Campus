@@ -91,4 +91,7 @@ export const bookingService = {
     const { data: updated } = await api.patch(`/api/bookings/${id}`, data);
     return mapBooking(updated);
   },
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/api/bookings/${id}`);
+  },
 };

@@ -298,4 +298,19 @@ public class BookingServiceImpl implements BookingService {
             throw new ForbiddenException("Admin privileges required");
         }
     }
+
+    @Override
+    public void delete(String id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
+        if (!booking.getUserId().equals(userId) && role != Role.ADMIN) {
+            throw new ForbiddenException("Cannot delete this booking");
+        }
+        if (booking.getStatus() != BookingStatus.APPROVED && booking.getStatus() != BookingStatus.REJECTED) {
+            throw new ConflictException("Only approved or rejected bookings can be deleted");
+        }
+        bookingRepository.deleteById(id);
+    }
 }
