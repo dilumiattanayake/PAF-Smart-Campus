@@ -147,9 +147,6 @@ const LoginPage = () => {
                   Sign In with Google
                 </Button>
 
-                <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-                  Default admin: <span className="font-medium text-foreground">admin@smartcampus.edu / Admin@123</span>
-                </div>
               </form>
 
               <p className="mt-4 text-center text-sm text-muted-foreground">
