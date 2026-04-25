@@ -26,7 +26,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final JwtService jwtService;
     private final UserRepository userRepository;
 
-    @Value("${app.oauth2.redirect-uri:http://localhost:5173/oauth2/callback}")
+    @Value("${app.oauth2.redirect-uri:http://localhost:8081/oauth2/callback}")
     private String redirectUri;
 
     @Override
@@ -55,7 +55,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             });
         } catch (Exception e) {
             log.error("Error during user lookup in SuccessHandler: {}", e.getMessage(), e);
-            response.sendRedirect("http://localhost:5173/login?error=database_lookup_failed");
+            String loginUri = redirectUri.replace("/oauth2/callback", "/login");
+            response.sendRedirect(loginUri + "?error=database_lookup_failed");
             return;
         }
 

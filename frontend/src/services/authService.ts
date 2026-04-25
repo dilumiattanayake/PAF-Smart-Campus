@@ -2,6 +2,15 @@ import axios from 'axios';
 import type { User } from '@/types';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9199';
+const oauthBaseURL = import.meta.env.VITE_OAUTH_BASE_URL || 'http://localhost:9199';
+
+const normalizeBaseUrl = (url: string): string => url.replace(/\/$/, '');
+
+// OAuth endpoint lives on backend root, not under /api.
+const resolveOAuthBaseUrl = (): string => {
+  const normalized = normalizeBaseUrl(oauthBaseURL);
+  return normalized.replace(/\/api$/, '');
+};
 
 export const api = axios.create({
   baseURL,
@@ -66,7 +75,7 @@ export const authService = {
     return mapUser(data);
   },
   getOAuthAuthorizeUrl: (): string => {
-    return `${baseURL}/oauth2/authorization/google`;
+    return `${resolveOAuthBaseUrl()}/oauth2/authorization/google`;
   },
   logout: async (): Promise<void> => {
     localStorage.removeItem('campus_token');

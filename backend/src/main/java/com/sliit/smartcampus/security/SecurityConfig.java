@@ -2,6 +2,7 @@ package com.sliit.smartcampus.security;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -33,6 +34,9 @@ public class SecurityConfig {
     private final CustomOAuth2UserService oAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
+    @Value("${app.oauth2.redirect-uri:http://localhost:8081/oauth2/callback}")
+    private String oauth2RedirectUri;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -52,7 +56,8 @@ public class SecurityConfig {
                         .failureHandler((request, response, exception) -> {
                             log.error("OAuth2 Login Failed: {}", exception.getMessage(), exception);
                             String encodedError = URLEncoder.encode(exception.getMessage(), StandardCharsets.UTF_8);
-                            response.sendRedirect("http://localhost:5173/login?error=" + encodedError);
+                            String loginUri = oauth2RedirectUri.replace("/oauth2/callback", "/login");
+                            response.sendRedirect(loginUri + "?error=" + encodedError);
                         })
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
