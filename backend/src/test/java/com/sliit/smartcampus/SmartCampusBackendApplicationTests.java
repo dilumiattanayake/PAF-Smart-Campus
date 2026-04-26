@@ -1,4 +1,4 @@
-package com.sliit.smartcampu.smart_campus_backend;
+package com.sliit.smartcampus;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

@@ -48,6 +48,16 @@ export interface Booking {
   createdAt: string;
 }
 
+export interface BookingRecommendation {
+  resourceId: string;
+  resourceName: string;
+  resourceType: string;
+  location: string;
+  capacity?: number;
+  availableFrom?: string;
+  availableTo?: string;
+}
+
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
@@ -72,6 +82,7 @@ export interface Ticket {
 export interface TicketComment {
   id: string;
   ticketId: string;
+  authorId?: string;
   author: string;
   authorRole: UserRole;
   content: string;
@@ -82,7 +93,7 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'BOOKING_STATUS' | 'TICKET_ASSIGNED' | 'TICKET_STATUS' | 'COMMENT' | 'SYSTEM' | 'RESOURCE' | 'BOOKING' | 'TICKET';
+  type: 'BOOKING_STATUS' | 'TICKET_ASSIGNED' | 'TICKET_STATUS' | 'COMMENT' | 'SYSTEM' | 'RESOURCE' | 'BOOKING' | 'TICKET' | 'BROADCAST';
   isRead: boolean;
   referenceId?: string;
   createdAt: string;

@@ -8,9 +8,10 @@ Backend for managing campus resources, bookings, maintenance tickets, comments, 
 - MongoDB (Atlas string pre-configured)
 
 ## Run (VS Code friendly)
-1. From `backend/`: `./mvnw spring-boot:run`
-2. Default admin (seeded if DB empty): email `admin@smartcampus.edu` / password `Admin@123`
-3. Swagger UI: `http://localhost:9090/swagger-ui.html` (change port via `SERVER_PORT`)
+1. From `backend/`: `./run-backend.ps1`
+2. This script stops any process already using port `9199`, then starts Spring Boot.
+3. Default admin (seeded if DB empty): email `admin@smartcampus.edu` / password `Admin@123`
+4. Swagger UI: `http://localhost:9199/swagger-ui.html`
 
 ## Environment
 - `spring.data.mongodb.uri` for DB (currently set to your Atlas URI in `application.properties`; comment/uncomment for local)
@@ -36,6 +37,15 @@ Backend for managing campus resources, bookings, maintenance tickets, comments, 
 - `notifications`: userId, title, message, type, read, referenceId, createdAt
 
 ## Postman Tips
-- Set `{{baseUrl}} = http://localhost:8080`
+- Set `{{baseUrl}} = http://localhost:9199`
 - Auth flow: register/login -> store `token` -> add header `Authorization: Bearer {{token}}`
 - Test roles quickly with seeded admin; create a user with role USER for booking/ticket flows.
+
+## Troubleshooting Port In Use
+- Error: `Port 9199 was already in use`
+- Cause: another backend process is already running.
+- Fix (recommended): use `./run-backend.ps1` instead of running `./mvnw spring-boot:run` repeatedly.
+- Manual fix (PowerShell): `Get-NetTCPConnection -LocalPort 9199 | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }`
+- Alternative: run backend on another port for this terminal only:
+	- PowerShell: `$env:SERVER_PORT=9200; ./mvnw spring-boot:run`
+	- Frontend base URL should match that port.

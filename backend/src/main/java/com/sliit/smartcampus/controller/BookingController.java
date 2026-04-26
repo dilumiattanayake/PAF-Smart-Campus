@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import java.util.List;
 
@@ -68,5 +69,11 @@ public class BookingController {
     @PatchMapping("/{id}")
     public ResponseEntity<BookingResponse> update(@PathVariable String id, @Valid @RequestBody BookingCreateRequest request) {
         return ResponseEntity.ok(bookingService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String id) {
+        bookingService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

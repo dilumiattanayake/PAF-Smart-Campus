@@ -14,6 +14,7 @@ public class CommentResponse {
     private String id;
     private String ticketId;
     private String authorId;
+    private String authorName;
     private Role authorRole;
     private String content;
     private Instant createdAt;

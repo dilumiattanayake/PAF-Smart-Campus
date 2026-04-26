@@ -2,12 +2,15 @@ package com.sliit.smartcampus.controller;
 
 import com.sliit.smartcampus.dto.comment.CommentCreateRequest;
 import com.sliit.smartcampus.dto.comment.CommentResponse;
+import com.sliit.smartcampus.dto.comment.CommentUpdateRequest;
 import com.sliit.smartcampus.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,5 +35,19 @@ public class CommentController {
     @GetMapping
     public ResponseEntity<List<CommentResponse>> list(@PathVariable String ticketId) {
         return ResponseEntity.ok(commentService.getComments(ticketId));
+    }
+
+    @PatchMapping("/{commentId}")
+    public ResponseEntity<CommentResponse> update(@PathVariable String ticketId,
+                                                  @PathVariable String commentId,
+                                                  @Valid @RequestBody CommentUpdateRequest request) {
+        return ResponseEntity.ok(commentService.updateComment(ticketId, commentId, request));
+    }
+
+    @DeleteMapping("/{commentId}")
+    public ResponseEntity<Void> delete(@PathVariable String ticketId,
+                                       @PathVariable String commentId) {
+        commentService.deleteComment(ticketId, commentId);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -15,4 +15,5 @@ public interface BookingService {
     BookingResponse reject(String id, BookingDecisionRequest request);
     BookingResponse cancel(String id);
     BookingResponse update(String id, BookingCreateRequest request);
+    void delete(String id);
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchFilterBar } from '@/components/shared/SearchFilterBar';
@@ -7,28 +7,72 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockTickets } from '@/data/mockData';
 import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { ticketService } from '@/services/ticketService';
+import { userService } from '@/services/userService';
+import type { Ticket } from '@/types';
 
 const TicketListPage = () => {
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [tab, setTab] = useState('all');
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [technicianNamesById, setTechnicianNamesById] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const tickets = tab === 'mine'
-    ? mockTickets.filter(t => t.createdBy === user?.name)
-    : mockTickets;
+  useEffect(() => {
+    let active = true;
+
+    const loadTickets = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await ticketService.getMyTickets(user?.name || '');
+        const technicianIds = Array.from(new Set(data.map(ticket => ticket.assignedTechnician).filter((id): id is string => Boolean(id))));
+        const nameResults = await Promise.all(
+          technicianIds.map(async technicianId => {
+            try {
+              const technician = await userService.getById(technicianId);
+              return [technicianId, technician.name] as const;
+            } catch {
+              return [technicianId, technicianId] as const;
+            }
+          })
+        );
+
+        if (active) {
+          setTickets(data);
+          setTechnicianNamesById(Object.fromEntries(nameResults));
+        }
+      } catch {
+        if (active) {
+          setError('Failed to load tickets. Please try again.');
+          setTickets([]);
+          setTechnicianNamesById({});
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadTickets();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.name]);
 
   const filtered = tickets.filter(t => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()) && !t.id.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     return true;
-  });
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -37,13 +81,6 @@ const TicketListPage = () => {
         description="Report and track campus issues"
         actions={<Link to="/tickets/new"><Button size="sm"><Plus className="h-3 w-3 mr-1" />New Ticket</Button></Link>}
       />
-
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="all">All Tickets</TabsTrigger>
-          <TabsTrigger value="mine">My Tickets</TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       <SearchFilterBar
         searchValue={search}
@@ -55,7 +92,15 @@ const TicketListPage = () => {
         ]}
       />
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <Card>
+          <div className="p-6 text-sm text-muted-foreground">Loading tickets...</div>
+        </Card>
+      ) : error ? (
+        <Card>
+          <div className="p-6 text-sm text-destructive">{error}</div>
+        </Card>
+      ) : filtered.length === 0 ? (
         <EmptyState title="No tickets found" action={<Link to="/tickets/new"><Button><Plus className="h-4 w-4 mr-1" />Create Ticket</Button></Link>} />
       ) : (
         <Card>
@@ -70,18 +115,22 @@ const TicketListPage = () => {
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(t => (
-                  <TableRow key={t.id} className="cursor-pointer hover:bg-muted/50">
+                  <TableRow key={t.id} className="hover:bg-muted/50">
                     <TableCell className="font-mono text-xs"><Link to={`/tickets/${t.id}`} className="hover:text-primary">{t.id}</Link></TableCell>
                     <TableCell className="font-medium max-w-[200px] truncate">{t.title}</TableCell>
                     <TableCell className="text-muted-foreground">{t.category}</TableCell>
                     <TableCell><StatusBadge status={t.priority} /></TableCell>
                     <TableCell><StatusBadge status={t.status} /></TableCell>
-                    <TableCell className="text-muted-foreground">{t.assignedTechnician || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{(t.assignedTechnician && technicianNamesById[t.assignedTechnician]) || t.assignedTechnician || '—'}</TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">{t.createdAt}</TableCell>
+                    <TableCell className="text-right">
+                      <Link to={`/tickets/${t.id}`}><Button size="sm" variant="ghost" className="h-8 text-xs">View</Button></Link>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

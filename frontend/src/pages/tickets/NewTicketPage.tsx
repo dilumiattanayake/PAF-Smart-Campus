@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, Upload } from 'lucide-react';
+import { AlertCircle, Upload, X } from 'lucide-react';
+import { ticketService } from '@/services/ticketService';
+
+const TITLE_MAX_LENGTH = 100;
+const DESCRIPTION_MAX_LENGTH = 500;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const MAX_ATTACHMENTS = 3;
+const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'application/pdf'];
 
 type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
 
@@ -31,25 +39,109 @@ const NewTicketPage = () => {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ title: '', category: '', description: '', priority: 'MEDIUM', resourceOrLocation: '', preferredContact: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<File[]>([]);
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.title.trim()) e.title = 'Required';
+    const title = form.title.trim();
+    const description = form.description.trim();
+    const preferredContact = form.preferredContact.trim();
+
+    if (!title) e.title = 'Required';
+    else if (title.length > TITLE_MAX_LENGTH) e.title = `Issue title cannot exceed ${TITLE_MAX_LENGTH} characters`;
+
     if (!form.category) e.category = 'Required';
-    if (!form.description.trim()) e.description = 'Required';
+
+    if (!description) e.description = 'Required';
+    else if (description.length > DESCRIPTION_MAX_LENGTH) e.description = `Description cannot exceed ${DESCRIPTION_MAX_LENGTH} characters`;
+
     if (!form.resourceOrLocation.trim()) e.resourceOrLocation = 'Required';
+    if (preferredContact && !/^\d{10}$/.test(preferredContact)) {
+      e.preferredContact = 'Preferred Contact must contain exactly 10 digits';
+    } else if (preferredContact && !preferredContact.startsWith('07')) {
+      e.preferredContact = 'Preferred Contact must start with 07';
+    }
+
+    if (files.length > MAX_ATTACHMENTS) {
+      e.attachments = `You can upload up to ${MAX_ATTACHMENTS} files`;
+    }
+    const invalidFile = files.find(file => !ALLOWED_FILE_TYPES.includes(file.type) || file.size > MAX_ATTACHMENT_SIZE);
+    if (invalidFile) {
+      if (!ALLOWED_FILE_TYPES.includes(invalidFile.type)) {
+        e.attachments = 'Only PNG, JPG, and PDF files are allowed';
+      } else {
+        e.attachments = 'Each attachment must be 10MB or smaller';
+      }
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
+  const addFiles = (selected: FileList | null) => {
+    if (!selected) return;
+    const incoming = Array.from(selected);
+    const combined = [...files, ...incoming];
+    if (combined.length > MAX_ATTACHMENTS) {
+      setErrors(prev => ({ ...prev, attachments: `You can upload up to ${MAX_ATTACHMENTS} files` }));
+      return;
+    }
+
+    const invalidType = incoming.find(file => !ALLOWED_FILE_TYPES.includes(file.type));
+    if (invalidType) {
+      setErrors(prev => ({ ...prev, attachments: 'Only PNG, JPG, and PDF files are allowed' }));
+      return;
+    }
+
+    const oversized = incoming.find(file => file.size > MAX_ATTACHMENT_SIZE);
+    if (oversized) {
+      setErrors(prev => ({ ...prev, attachments: 'Each attachment must be 10MB or smaller' }));
+      return;
+    }
+
+    setFiles(combined);
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.attachments;
+      return next;
+    });
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const preferredContact = form.preferredContact.trim();
+    if (preferredContact && !preferredContact.startsWith('07')) {
+      toast({ title: 'Invalid preferred contact', description: 'Preferred Contact must start with 07.' });
+      setErrors(prev => ({ ...prev, preferredContact: 'Preferred Contact must start with 07' }));
+      return;
+    }
     if (!validate()) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-    setLoading(false);
-    toast({ title: 'Ticket created', description: 'Your maintenance request has been submitted.' });
-    navigate('/tickets');
+    try {
+      await ticketService.create({
+        title: form.title.trim(),
+        category: form.category,
+        description: form.description.trim(),
+        priority: form.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+        resourceOrLocation: form.resourceOrLocation.trim(),
+        preferredContact: form.preferredContact.trim(),
+        attachmentUrls: [],
+        attachments: files,
+      });
+      toast({ title: 'Ticket created', description: 'Your maintenance request has been submitted.' });
+      navigate('/tickets');
+    } catch (error) {
+      const message = isAxiosError<{ message?: string }>(error)
+        ? (error.response?.data?.message || 'Please try again.')
+        : 'Please try again.';
+      toast({ title: 'Failed to create ticket', description: message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,7 +151,8 @@ const NewTicketPage = () => {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField id="title" label="Issue Title" error={errors.title}>
-              <Input id="title" name="title" autoComplete="off" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief summary of the issue" />
+              <Input id="title" name="title" autoComplete="off" value={form.title} maxLength={TITLE_MAX_LENGTH} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief summary of the issue" />
+              <p className="text-xs text-muted-foreground text-right">{form.title.length}/{TITLE_MAX_LENGTH}</p>
             </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField id="category" label="Category" error={errors.category}>
@@ -82,23 +175,61 @@ const NewTicketPage = () => {
               </FormField>
             </div>
             <FormField id="description" label="Description" error={errors.description}>
-              <Textarea id="description" name="description" autoComplete="off" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Provide details about the issue..." />
+              <Textarea id="description" name="description" autoComplete="off" value={form.description} maxLength={DESCRIPTION_MAX_LENGTH} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Provide details about the issue..." />
+              <p className="text-xs text-muted-foreground text-right">{form.description.length}/{DESCRIPTION_MAX_LENGTH}</p>
             </FormField>
             <FormField id="resourceOrLocation" label="Resource / Location" error={errors.resourceOrLocation}>
               <Input id="resourceOrLocation" name="resourceOrLocation" autoComplete="off" value={form.resourceOrLocation} onChange={e => setForm({ ...form, resourceOrLocation: e.target.value })} placeholder="e.g., Building A, Lecture Hall A" />
             </FormField>
             <FormField id="preferredContact" label="Preferred Contact (optional)" error={errors.preferredContact}>
-              <Input id="preferredContact" name="preferredContact" autoComplete="off" value={form.preferredContact} onChange={e => setForm({ ...form, preferredContact: e.target.value })} placeholder="Email or phone" />
+              <Input
+                id="preferredContact"
+                name="preferredContact"
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={10}
+                value={form.preferredContact}
+                onChange={e => setForm({ ...form, preferredContact: e.target.value.replace(/\D/g, '') })}
+                placeholder="10-digit phone number"
+              />
             </FormField>
 
-            {/* File upload UI */}
             <div className="space-y-2">
-              <Label>Attachments (optional)</Label>
-              <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+              <Label htmlFor="attachments">Attachments (optional)</Label>
+              <label htmlFor="attachments" className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer block">
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">Drag & drop files here, or click to browse</p>
-                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, PDF up to 10MB</p>
-              </div>
+                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, PDF up to 10MB (max 3 files)</p>
+              </label>
+              <Input
+                id="attachments"
+                type="file"
+                accept=".png,.jpg,.jpeg,.pdf"
+                multiple
+                className="hidden"
+                onChange={e => {
+                  addFiles(e.target.files);
+                  e.currentTarget.value = '';
+                }}
+              />
+              {errors.attachments && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.attachments}
+                </p>
+              )}
+              {files.length > 0 && (
+                <div className="space-y-2">
+                  {files.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                      <span className="truncate">{file.name}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFile(index)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 pt-2">

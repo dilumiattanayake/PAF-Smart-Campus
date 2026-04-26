@@ -7,11 +7,16 @@ public final class CommentMapper {
     private CommentMapper() {}
 
     public static CommentResponse toResponse(Comment comment) {
+        return toResponse(comment, null);
+    }
+
+    public static CommentResponse toResponse(Comment comment, String authorName) {
         if (comment == null) return null;
         return CommentResponse.builder()
                 .id(comment.getId())
                 .ticketId(comment.getTicketId())
                 .authorId(comment.getAuthorId())
+                .authorName(authorName)
                 .authorRole(comment.getAuthorRole())
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())

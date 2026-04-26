@@ -7,7 +7,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class CommentCreateRequest {
+public class CommentUpdateRequest {
     @NotBlank
     @Size(max = 100)
     private String content;

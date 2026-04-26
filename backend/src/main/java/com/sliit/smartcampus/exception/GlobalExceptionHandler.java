@@ -7,11 +7,14 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -36,7 +39,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), ex.getDetails());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -51,13 +54,23 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex, HttpServletRequest request) {
+        log.error("Unhandled exception occurred at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request.getRequestURI());
     }
 
-    private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, String path) {
-        return ResponseEntity.status(status)
-                .body(new ErrorResponse(Instant.now(), status.value(), message, path));
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Attachment size exceeds the 10MB limit", request.getRequestURI());
     }
 
-    public record ErrorResponse(Instant timestamp, int status, String message, String path) {}
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, String path) {
+        return build(status, message, path, null);
+    }
+
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, String path, Map<String, Object> details) {
+        return ResponseEntity.status(status)
+                .body(new ErrorResponse(Instant.now(), status.value(), message, path, details));
+    }
+
+    public record ErrorResponse(Instant timestamp, int status, String message, String path, Map<String, Object> details) {}
 }

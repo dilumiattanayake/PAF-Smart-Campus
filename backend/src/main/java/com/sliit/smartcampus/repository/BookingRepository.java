@@ -11,4 +11,5 @@ import java.util.List;
 public interface BookingRepository extends MongoRepository<Booking, String> {
     List<Booking> findByUserId(String userId);
     List<Booking> findByResourceIdAndBookingDateAndStatusIn(String resourceId, LocalDate bookingDate, Collection<BookingStatus> statuses);
+    List<Booking> findByUserIdAndBookingDateAndStatusIn(String userId, LocalDate bookingDate, Collection<BookingStatus> statuses);
 }

@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
+import OAuth2CallbackPage from "@/pages/auth/OAuth2CallbackPage";
 import DashboardPage from "@/pages/DashboardPage";
 import ResourceListPage from "@/pages/resources/ResourceListPage";
 import ResourceDetailPage from "@/pages/resources/ResourceDetailPage";
@@ -16,6 +17,7 @@ import BookingListPage from "@/pages/bookings/BookingListPage";
 import BookingDetailPage from "@/pages/bookings/BookingDetailPage";
 import NewBookingPage from "@/pages/bookings/NewBookingPage";
 import TicketListPage from "@/pages/tickets/TicketListPage";
+import TechnicianTicketsPage from "./pages/technician/TechnicianTicketsPage";
 import TicketDetailPage from "@/pages/tickets/TicketDetailPage";
 import NewTicketPage from "@/pages/tickets/NewTicketPage";
 import NotificationsPage from "@/pages/NotificationsPage";
@@ -46,6 +48,7 @@ const AppRoutes = () => (
     <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
     <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
     <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+    <Route path="/oauth2/callback" element={<PublicRoute><OAuth2CallbackPage /></PublicRoute>} />
 
     <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
       <Route path="/dashboard" element={<DashboardPage />} />
@@ -65,6 +68,7 @@ const AppRoutes = () => (
       <Route path="/admin/bookings" element={<AdminBookingsPage />} />
       <Route path="/admin/tickets" element={<AdminTicketsPage />} />
       <Route path="/technician/tasks" element={<TechnicianTasksPage />} />
+      <Route path="/technician/tickets" element={<TechnicianTicketsPage />} />
     </Route>
 
     <Route path="*" element={<NotFound />} />

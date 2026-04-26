@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { bookingService } from '@/services/bookingService';
 import { resourceService } from '@/services/resourceService';
@@ -143,8 +143,19 @@ const BookingListPage = () => {
                               }
                             }}>Cancel</Button>
                           </div>
+                        ) : (b.status === 'APPROVED' || b.status === 'REJECTED') ? (
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => {
+                            try {
+                              await bookingService.delete(b.id);
+                              toast({ title: 'Booking deleted' });
+                              load(tab, statusFilter);
+                            } catch (err: any) {
+                              const message = err?.response?.data?.message as string | undefined;
+                              toast({ title: 'Unable to delete booking', description: message || 'Please try again.', variant: 'destructive' });
+                            }
+                          }}><Trash2 className="h-4 w-4" /></Button>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Locked</span>
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
                     )}

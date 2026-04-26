@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { GraduationCap, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+import { authService } from '@/services/authService';
 
 const LoginPage = () => {
   const { login, isLoading } = useAuth();
@@ -38,6 +39,10 @@ const LoginPage = () => {
     } catch {
       toast({ title: 'Login failed', description: 'Invalid credentials. Please try again.', variant: 'destructive' });
     }
+  };
+
+  const handleGoogleSignIn = () => {
+    window.location.assign(authService.getOAuthAuthorizeUrl());
   };
 
   return (
@@ -123,9 +128,25 @@ const LoginPage = () => {
                   {isLoading ? 'Signing in...' : 'Sign in'}
                 </Button>
 
-                <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-                  Default admin: <span className="font-medium text-foreground">admin@smartcampus.edu / Admin@123</span>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or</span>
+                  </div>
                 </div>
+
+                <Button type="button" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGoogleSignIn}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#FFFFFF" d="M12 10.2v3.92h5.45c-.24 1.26-.95 2.33-2.01 3.04l3.24 2.52c1.89-1.74 2.98-4.31 2.98-7.38 0-.71-.06-1.39-.18-2.04H12z" />
+                    <path fill="#FFFFFF" d="M12 22c2.7 0 4.96-.89 6.62-2.42l-3.24-2.52c-.9.6-2.05.96-3.38.96-2.59 0-4.79-1.75-5.58-4.1l-3.34 2.58C4.72 19.77 8.08 22 12 22z" />
+                    <path fill="#FFFFFF" d="M6.42 13.92c-.2-.6-.32-1.23-.32-1.92s.12-1.32.32-1.92L3.08 7.5A9.94 9.94 0 0 0 2 12c0 1.61.39 3.13 1.08 4.5l3.34-2.58z" />
+                    <path fill="#FFFFFF" d="M12 5.98c1.47 0 2.79.5 3.83 1.48l2.87-2.87C16.95 2.96 14.7 2 12 2 8.08 2 4.72 4.23 3.08 7.5l3.34 2.58c.79-2.35 2.99-4.1 5.58-4.1z" />
+                  </svg>
+                  Sign In with Google
+                </Button>
+
               </form>
 
               <p className="mt-4 text-center text-sm text-muted-foreground">

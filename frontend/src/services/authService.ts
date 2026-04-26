@@ -1,11 +1,19 @@
 import axios from 'axios';
 import type { User } from '@/types';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090';
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9199';
+const oauthBaseURL = import.meta.env.VITE_OAUTH_BASE_URL || 'http://localhost:9199';
+
+const normalizeBaseUrl = (url: string): string => url.replace(/\/$/, '');
+
+// OAuth endpoint lives on backend root, not under /api.
+const resolveOAuthBaseUrl = (): string => {
+  const normalized = normalizeBaseUrl(oauthBaseURL);
+  return normalized.replace(/\/api$/, '');
+};
 
 export const api = axios.create({
   baseURL,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use(config => {
@@ -24,6 +32,15 @@ interface AuthResponse {
     createdAt?: string;
     updatedAt?: string;
   };
+}
+
+interface UserProfileResponse {
+  id: string;
+  fullName: string;
+  email: string;
+  role: 'USER' | 'ADMIN' | 'TECHNICIAN';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const mapUser = (u: AuthResponse['user']): User => ({
@@ -51,6 +68,13 @@ export const authService = {
     localStorage.setItem('campus_token', data.token);
     localStorage.setItem('campus_user', JSON.stringify(mapUser(data.user)));
     return mapUser(data.user);
+  },
+  getCurrentUser: async (): Promise<User> => {
+    const { data } = await api.get<UserProfileResponse>('/api/auth/me');
+    return mapUser(data);
+  },
+  getOAuthAuthorizeUrl: (): string => {
+    return `${resolveOAuthBaseUrl()}/oauth2/authorization/google`;
   },
   logout: async (): Promise<void> => {
     localStorage.removeItem('campus_token');
