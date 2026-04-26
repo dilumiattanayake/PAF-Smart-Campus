@@ -8,11 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, Upload } from 'lucide-react';
+import { AlertCircle, Upload, X } from 'lucide-react';
 import { ticketService } from '@/services/ticketService';
 
 const TITLE_MAX_LENGTH = 100;
 const DESCRIPTION_MAX_LENGTH = 500;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const MAX_ATTACHMENTS = 3;
+const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'application/pdf'];
 
 type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
 
@@ -35,6 +38,7 @@ const NewTicketPage = () => {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ title: '', category: '', description: '', priority: 'MEDIUM', resourceOrLocation: '', preferredContact: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<File[]>([]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -57,8 +61,53 @@ const NewTicketPage = () => {
       e.preferredContact = 'Preferred Contact must start with 07';
     }
 
+    if (files.length > MAX_ATTACHMENTS) {
+      e.attachments = `You can upload up to ${MAX_ATTACHMENTS} files`;
+    }
+    const invalidFile = files.find(file => !ALLOWED_FILE_TYPES.includes(file.type) || file.size > MAX_ATTACHMENT_SIZE);
+    if (invalidFile) {
+      if (!ALLOWED_FILE_TYPES.includes(invalidFile.type)) {
+        e.attachments = 'Only PNG, JPG, and PDF files are allowed';
+      } else {
+        e.attachments = 'Each attachment must be 10MB or smaller';
+      }
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const addFiles = (selected: FileList | null) => {
+    if (!selected) return;
+    const incoming = Array.from(selected);
+    const combined = [...files, ...incoming];
+    if (combined.length > MAX_ATTACHMENTS) {
+      setErrors(prev => ({ ...prev, attachments: `You can upload up to ${MAX_ATTACHMENTS} files` }));
+      return;
+    }
+
+    const invalidType = incoming.find(file => !ALLOWED_FILE_TYPES.includes(file.type));
+    if (invalidType) {
+      setErrors(prev => ({ ...prev, attachments: 'Only PNG, JPG, and PDF files are allowed' }));
+      return;
+    }
+
+    const oversized = incoming.find(file => file.size > MAX_ATTACHMENT_SIZE);
+    if (oversized) {
+      setErrors(prev => ({ ...prev, attachments: 'Each attachment must be 10MB or smaller' }));
+      return;
+    }
+
+    setFiles(combined);
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.attachments;
+      return next;
+    });
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,6 +129,7 @@ const NewTicketPage = () => {
         resourceOrLocation: form.resourceOrLocation.trim(),
         preferredContact: form.preferredContact.trim(),
         attachmentUrls: [],
+        attachments: files,
       });
       toast({ title: 'Ticket created', description: 'Your maintenance request has been submitted.' });
       navigate('/tickets');
@@ -140,14 +190,42 @@ const NewTicketPage = () => {
               />
             </FormField>
 
-            {/* File upload UI */}
             <div className="space-y-2">
-              <Label>Attachments (optional)</Label>
-              <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+              <Label htmlFor="attachments">Attachments (optional)</Label>
+              <label htmlFor="attachments" className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer block">
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">Drag & drop files here, or click to browse</p>
-                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, PDF up to 10MB</p>
-              </div>
+                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, PDF up to 10MB (max 3 files)</p>
+              </label>
+              <Input
+                id="attachments"
+                type="file"
+                accept=".png,.jpg,.jpeg,.pdf"
+                multiple
+                className="hidden"
+                onChange={e => {
+                  addFiles(e.target.files);
+                  e.currentTarget.value = '';
+                }}
+              />
+              {errors.attachments && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.attachments}
+                </p>
+              )}
+              {files.length > 0 && (
+                <div className="space-y-2">
+                  {files.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                      <span className="truncate">{file.name}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFile(index)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 pt-2">

@@ -38,6 +38,7 @@ export type TicketCreatePayload = {
   resourceOrLocation: string;
   preferredContact?: string;
   attachmentUrls?: string[];
+  attachments?: File[];
 };
 
 const mapTicket = (t: TicketApiResponse): Ticket => ({
@@ -84,7 +85,25 @@ export const ticketService = {
     return data.map(mapTicket);
   },
   create: async (data: TicketCreatePayload): Promise<Ticket> => {
-    const { data: created } = await api.post<TicketApiResponse>('/api/tickets', data);
+    const attachments = data.attachments || [];
+    const requestBody = {
+      title: data.title,
+      category: data.category,
+      description: data.description,
+      priority: data.priority,
+      resourceOrLocation: data.resourceOrLocation,
+      preferredContact: data.preferredContact,
+      attachmentUrls: data.attachmentUrls || [],
+    };
+
+    const created = attachments.length > 0
+      ? (await api.post<TicketApiResponse>('/api/tickets', (() => {
+          const formData = new FormData();
+          formData.append('ticket', new Blob([JSON.stringify(requestBody)], { type: 'application/json' }));
+          attachments.forEach(file => formData.append('attachments', file));
+          return formData;
+        })(), { headers: { 'Content-Type': 'multipart/form-data' } })).data
+      : (await api.post<TicketApiResponse>('/api/tickets', requestBody)).data;
     return mapTicket(created);
   },
   updateStatus: async (id: string, status: Ticket['status'], resolutionNotes?: string): Promise<Ticket> => {

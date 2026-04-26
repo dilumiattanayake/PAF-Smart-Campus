@@ -8,16 +8,23 @@ import com.sliit.smartcampus.model.enums.TicketStatus;
 import com.sliit.smartcampus.service.TicketService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 
 @RestController
@@ -27,9 +34,28 @@ public class TicketController {
 
     private final TicketService ticketService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<TicketResponse> create(@Valid @RequestBody TicketCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.create(request));
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TicketResponse> createWithAttachments(
+            @Valid @RequestPart("ticket") TicketCreateRequest request,
+            @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createWithAttachments(request, attachments));
+    }
+
+    @GetMapping("/attachments/{filename:.+}")
+    public ResponseEntity<Resource> getAttachment(@PathVariable String filename) throws IOException {
+        Resource attachment = ticketService.loadAttachment(filename);
+        String detectedType = Files.probeContentType(attachment.getFile().toPath());
+        String contentType = detectedType != null ? detectedType : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(attachment);
     }
 
     @GetMapping("/my")

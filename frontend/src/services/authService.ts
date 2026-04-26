@@ -14,7 +14,6 @@ const resolveOAuthBaseUrl = (): string => {
 
 export const api = axios.create({
   baseURL,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use(config => {

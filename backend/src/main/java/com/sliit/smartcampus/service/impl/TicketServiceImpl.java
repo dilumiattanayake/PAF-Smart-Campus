@@ -22,18 +22,45 @@ import com.sliit.smartcampus.service.NotificationService;
 import com.sliit.smartcampus.service.TicketService;
 import com.sliit.smartcampus.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class TicketServiceImpl implements TicketService {
 
+    private static final int MAX_ATTACHMENTS = 3;
+    private static final long MAX_FILE_SIZE_BYTES = 10L * 1024L * 1024L;
+    private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE = Map.of(
+            "image/png", ".png",
+            "image/jpeg", ".jpg",
+            "application/pdf", ".pdf"
+    );
+    private static final Set<String> ALLOWED_CONTENT_TYPES = EXTENSION_BY_CONTENT_TYPE.keySet();
+
     private final TicketRepository ticketRepository;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+
+    @Value("${app.ticket.attachments-dir:uploads/tickets}")
+    private String attachmentsDirectory;
 
     @Override
     public TicketResponse create(TicketCreateRequest request) {
@@ -47,6 +74,21 @@ public class TicketServiceImpl implements TicketService {
         ticketRepository.save(ticket);
         notifySupportStaffOnCreate(ticket, userId);
         return TicketMapper.toResponse(ticket, List.of());
+    }
+
+    @Override
+    public TicketResponse createWithAttachments(TicketCreateRequest request, List<MultipartFile> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return create(request);
+        }
+        if (request.getAttachmentUrls() != null && !request.getAttachmentUrls().isEmpty()) {
+            throw new BadRequestException("Do not pass attachment URLs when uploading files");
+        }
+        if (attachments.size() > MAX_ATTACHMENTS) {
+            throw new BadRequestException("Up to 3 attachments are allowed");
+        }
+        request.setAttachmentUrls(storeAttachments(attachments));
+        return create(request);
     }
 
     @Override
@@ -89,6 +131,36 @@ public class TicketServiceImpl implements TicketService {
             throw new ForbiddenException("Not allowed to view this ticket");
         }
         return TicketMapper.toResponse(ticket, getCommentsForTicket(ticket.getId()), resolveUserName(ticket.getCreatedByUserId()));
+    }
+
+    @Override
+    public Resource loadAttachment(String filename) {
+        String safeFilename = sanitizeFilename(filename);
+        String attachmentUrl = "/api/tickets/attachments/" + safeFilename;
+        List<Ticket> tickets = ticketRepository.findByAttachmentUrlsContains(attachmentUrl);
+        if (tickets.isEmpty()) {
+            throw new ResourceNotFoundException("Attachment not found");
+        }
+
+        String userId = SecurityUtils.getCurrentUserId().orElseThrow();
+        Role role = SecurityUtils.getCurrentUserRole().orElse(Role.USER);
+        boolean authorized = role == Role.ADMIN || tickets.stream().anyMatch(ticket ->
+                userId.equals(ticket.getCreatedByUserId())
+                        || (role == Role.TECHNICIAN && userId.equals(ticket.getAssignedTechnicianId()))
+        );
+        if (!authorized) {
+            throw new ForbiddenException("Not allowed to access this attachment");
+        }
+
+        Path path = Paths.get(attachmentsDirectory).toAbsolutePath().normalize().resolve(safeFilename).normalize();
+        if (!Files.exists(path) || !path.startsWith(Paths.get(attachmentsDirectory).toAbsolutePath().normalize())) {
+            throw new ResourceNotFoundException("Attachment not found");
+        }
+        try {
+            return new UrlResource(path.toUri());
+        } catch (IOException e) {
+            throw new ResourceNotFoundException("Attachment not found");
+        }
     }
 
     @Override
@@ -193,5 +265,55 @@ public class TicketServiceImpl implements TicketService {
                 );
             }
         }
+    }
+
+    private List<String> storeAttachments(List<MultipartFile> attachments) {
+        Path uploadRoot = Paths.get(attachmentsDirectory).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(uploadRoot);
+        } catch (IOException e) {
+            throw new BadRequestException("Unable to initialize upload storage");
+        }
+
+        return attachments.stream().map(file -> storeSingleAttachment(file, uploadRoot)).toList();
+    }
+
+    private String storeSingleAttachment(MultipartFile file, Path uploadRoot) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Attachment file is empty");
+        }
+        if (file.getSize() > MAX_FILE_SIZE_BYTES) {
+            throw new BadRequestException("Each attachment must be 10MB or smaller");
+        }
+
+        String contentType = Optional.ofNullable(file.getContentType()).orElse("").toLowerCase();
+        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new BadRequestException("Only PNG, JPG, and PDF files are allowed");
+        }
+
+        String extension = EXTENSION_BY_CONTENT_TYPE.get(contentType);
+        String filename = UUID.randomUUID() + extension;
+        Path target = uploadRoot.resolve(filename).normalize();
+        if (!target.startsWith(uploadRoot)) {
+            throw new BadRequestException("Invalid file path");
+        }
+
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new BadRequestException("Failed to store attachment");
+        }
+        return "/api/tickets/attachments/" + filename;
+    }
+
+    private String sanitizeFilename(String filename) {
+        String normalized = StringUtils.cleanPath(filename == null ? "" : filename);
+        if (normalized.contains("..") || normalized.contains("/") || normalized.contains("\\")) {
+            throw new BadRequestException("Invalid attachment name");
+        }
+        if (!StringUtils.hasText(normalized)) {
+            throw new BadRequestException("Invalid attachment name");
+        }
+        return normalized;
     }
 }
