@@ -2,14 +2,17 @@ package com.sliit.smartcampus.service.impl;
 
 import com.sliit.smartcampus.dto.booking.BookingCreateRequest;
 import com.sliit.smartcampus.dto.booking.BookingDecisionRequest;
+import com.sliit.smartcampus.dto.booking.BookingRecommendation;
 import com.sliit.smartcampus.dto.booking.BookingResponse;
 import com.sliit.smartcampus.exception.ConflictException;
 import com.sliit.smartcampus.exception.ForbiddenException;
 import com.sliit.smartcampus.exception.ResourceNotFoundException;
 import com.sliit.smartcampus.mapper.BookingMapper;
 import com.sliit.smartcampus.model.Booking;
+import com.sliit.smartcampus.model.Resource;
 import com.sliit.smartcampus.model.enums.BookingStatus;
 import com.sliit.smartcampus.model.enums.NotificationType;
+import com.sliit.smartcampus.model.enums.ResourceStatus;
 import com.sliit.smartcampus.model.enums.Role;
 import com.sliit.smartcampus.repository.BookingRepository;
 import com.sliit.smartcampus.repository.ResourceRepository;
@@ -22,9 +25,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -59,7 +66,6 @@ public class BookingServiceImpl implements BookingService {
         booking.setRequesterEmail(user.getEmail());
 
         ensureNoConflict(booking, null);
-        ensureNoUserConflict(booking, null);
         bookingRepository.save(booking);
         return toResponseWithNames(booking);
     }
@@ -120,7 +126,6 @@ public class BookingServiceImpl implements BookingService {
         booking.setApprovedBy(SecurityUtils.getCurrentUserId().orElse(null));
         booking.setRejectionReason(null);
         ensureNoConflict(booking, id);
-        ensureNoUserConflict(booking, id);
         bookingRepository.save(booking);
         notificationService.createNotification(booking.getUserId(), "Booking approved",
                 "Your booking has been approved.", NotificationType.BOOKING_STATUS, booking.getId());
@@ -199,9 +204,9 @@ public class BookingServiceImpl implements BookingService {
                 .bookingDate(request.getBookingDate())
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
+            .attendeeCount(request.getAttendeeCount())
                 .build();
         ensureNoConflict(proposed, id);
-        ensureNoUserConflict(proposed, id);
 
         booking.setResourceId(request.getResourceId());
         booking.setPurpose(request.getPurpose());
@@ -229,33 +234,107 @@ public class BookingServiceImpl implements BookingService {
                 continue;
             }
             if (timesOverlap(newStart, newEnd, existing.getStartTime(), existing.getEndTime())) {
+                List<BookingRecommendation> recommendations = findAlternativeResources(booking);
                 throw new ConflictException("Time conflict: resource is already booked on " + booking.getBookingDate()
-                        + " (" + existing.getStartTime() + "-" + existing.getEndTime() + ").");
+                        + " (" + existing.getStartTime() + "-" + existing.getEndTime() + ").",
+                        buildConflictDetails(booking, recommendations));
             }
         }
     }
 
-    private void ensureNoUserConflict(Booking booking, String currentBookingId) {
-        if (booking.getUserId() == null || booking.getUserId().isBlank()) return;
-        List<Booking> conflicts = bookingRepository.findByUserIdAndBookingDateAndStatusIn(
-                booking.getUserId(),
-                booking.getBookingDate(),
-                EnumSet.of(BookingStatus.PENDING, BookingStatus.APPROVED)
-        );
-        LocalTime newStart = booking.getStartTime();
-        LocalTime newEnd = booking.getEndTime();
-        for (Booking existing : conflicts) {
-            if (currentBookingId != null && existing.getId().equals(currentBookingId)) {
+    private LinkedHashMap<String, Object> buildConflictDetails(Booking booking, List<BookingRecommendation> recommendations) {
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>();
+        details.put("code", "BOOKING_TIME_CONFLICT");
+        details.put("resourceId", booking.getResourceId());
+        details.put("bookingDate", booking.getBookingDate());
+        details.put("startTime", booking.getStartTime());
+        details.put("endTime", booking.getEndTime());
+        details.put("recommendations", recommendations);
+        return details;
+    }
+
+    private List<BookingRecommendation> findAlternativeResources(Booking booking) {
+        Resource requestedResource = resourceRepository.findById(booking.getResourceId()).orElse(null);
+        String requestedLocation = requestedResource != null ? requestedResource.getLocation() : null;
+        if (requestedLocation == null || requestedLocation.isBlank()) {
+            return List.of();
+        }
+
+        int requiredCapacity = booking.getAttendeeCount() != null ? booking.getAttendeeCount() : 0;
+        List<BookingRecommendation> alternatives = new ArrayList<>();
+
+        for (Resource candidate : resourceRepository.findAll()) {
+            if (candidate == null || candidate.getId() == null) {
                 continue;
             }
-            if (timesOverlap(newStart, newEnd, existing.getStartTime(), existing.getEndTime())) {
-                String resourceLabel = existing.getResourceName() != null && !existing.getResourceName().isBlank()
-                        ? existing.getResourceName()
-                        : existing.getResourceId();
-                throw new ConflictException("Time conflict: requester already has a booking for " + resourceLabel + " on "
-                        + booking.getBookingDate() + " (" + existing.getStartTime() + "-" + existing.getEndTime() + ").");
+            if (candidate.getId().equals(booking.getResourceId())) {
+                continue;
+            }
+            if (candidate.getLocation() == null
+                    || !candidate.getLocation().trim().toLowerCase(Locale.ROOT)
+                    .equals(requestedLocation.trim().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            ResourceStatus status = candidate.getStatus();
+            if (status != ResourceStatus.ACTIVE && status != ResourceStatus.AVAILABLE) {
+                continue;
+            }
+            if (requiredCapacity > 0 && candidate.getCapacity() != null && candidate.getCapacity() < requiredCapacity) {
+                continue;
+            }
+            if (!isWithinResourceAvailability(candidate, booking.getStartTime(), booking.getEndTime())) {
+                continue;
+            }
+            if (isResourceBookedForRange(candidate.getId(), booking.getBookingDate(), booking.getStartTime(), booking.getEndTime())) {
+                continue;
+            }
+
+            alternatives.add(BookingRecommendation.builder()
+                    .resourceId(candidate.getId())
+                    .resourceName(candidate.getName())
+                    .resourceType(candidate.getType())
+                    .location(candidate.getLocation())
+                    .capacity(candidate.getCapacity())
+                    .availableFrom(candidate.getAvailableFrom())
+                    .availableTo(candidate.getAvailableTo())
+                    .build());
+        }
+
+        return alternatives.stream()
+                .sorted(Comparator.comparing((BookingRecommendation r) -> capacityDistance(r.getCapacity(), requiredCapacity))
+                        .thenComparing(r -> r.getResourceName() == null ? "" : r.getResourceName(), String.CASE_INSENSITIVE_ORDER))
+                .limit(5)
+                .toList();
+    }
+
+    private int capacityDistance(Integer capacity, int requiredCapacity) {
+        if (requiredCapacity <= 0 || capacity == null) {
+            return 0;
+        }
+        return Math.abs(capacity - requiredCapacity);
+    }
+
+    private boolean isWithinResourceAvailability(Resource resource, LocalTime requestedStart, LocalTime requestedEnd) {
+        LocalTime availableFrom = resource.getAvailableFrom();
+        LocalTime availableTo = resource.getAvailableTo();
+        if (availableFrom == null || availableTo == null) {
+            return true;
+        }
+        return !requestedStart.isBefore(availableFrom) && !requestedEnd.isAfter(availableTo);
+    }
+
+    private boolean isResourceBookedForRange(String resourceId, LocalDate date, LocalTime requestedStart, LocalTime requestedEnd) {
+        List<Booking> existingBookings = bookingRepository.findByResourceIdAndBookingDateAndStatusIn(
+                resourceId,
+                date,
+                EnumSet.of(BookingStatus.APPROVED)
+        );
+        for (Booking existing : existingBookings) {
+            if (timesOverlap(requestedStart, requestedEnd, existing.getStartTime(), existing.getEndTime())) {
+                return true;
             }
         }
+        return false;
     }
 
     private boolean timesOverlap(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
