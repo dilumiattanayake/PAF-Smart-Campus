@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
 import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { resourceService } from '@/services/resourceService';
 import { bookingService } from '@/services/bookingService';
-import type { Booking, Resource } from '@/types';
+import type { BookingRecommendation, Resource } from '@/types';
 import { useEffect } from 'react';
 
 type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
@@ -33,7 +33,6 @@ const FormField = ({ id, label, error, children }: FieldProps) => (
 const NewBookingPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
   const [params] = useSearchParams();
   const editId = params.get('editId');
   const [loading, setLoading] = useState(false);
@@ -44,6 +43,8 @@ const NewBookingPage = () => {
     attendeeCount: '', notes: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [recommendations, setRecommendations] = useState<BookingRecommendation[]>([]);
+  const [conflictMessage, setConflictMessage] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -81,50 +82,13 @@ const NewBookingPage = () => {
     return Object.keys(e).length === 0;
   };
 
-  const toMinutes = (t: string) => {
-    const m = /^(\d{1,2}):(\d{2})/.exec(t);
-    if (!m) return null;
-    const hh = Number(m[1]);
-    const mm = Number(m[2]);
-    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
-    return hh * 60 + mm;
-  };
-
-  const overlaps = (start1: string, end1: string, start2: string, end2: string) => {
-    const s1 = toMinutes(start1);
-    const e1 = toMinutes(end1);
-    const s2 = toMinutes(start2);
-    const e2 = toMinutes(end2);
-    if (s1 == null || e1 == null || s2 == null || e2 == null) return false;
-    return s1 < e2 && e1 > s2;
-  };
-
-  const findUserTimeConflict = (all: Booking[], date: string, startTime: string, endTime: string, ignoreId?: string | null) => {
-    return all.find(b =>
-      b.id !== ignoreId &&
-      b.bookingDate === date &&
-      (b.status === 'PENDING' || b.status === 'APPROVED') &&
-      overlaps(startTime, endTime, b.startTime, b.endTime)
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
+    setRecommendations([]);
+    setConflictMessage('');
     try {
-      // Client-side guard: avoid letting a USER double-book themselves.
-      if (user?.role === 'USER') {
-        const mine = await bookingService.getMyBookings();
-        const conflict = findUserTimeConflict(mine, form.bookingDate, form.startTime, form.endTime, editId);
-        if (conflict) {
-          const msg = `You already have a booking for ${conflict.resourceName || conflict.resourceId} on ${conflict.bookingDate} (${conflict.startTime}–${conflict.endTime}).`;
-          setErrors(prev => ({ ...prev, startTime: msg, endTime: msg }));
-          toast({ title: 'Time conflict', description: msg, variant: 'destructive' });
-          return;
-        }
-      }
-
       const payload = {
         resourceId: form.resourceId,
         purpose: form.purpose,
@@ -145,9 +109,21 @@ const NewBookingPage = () => {
     } catch (err: any) {
       const conflict = err?.response?.status === 409;
       const serverMessage = err?.response?.data?.message as string | undefined;
+      const serverRecommendations = err?.response?.data?.details?.recommendations;
+      const parsedRecommendations = Array.isArray(serverRecommendations)
+        ? (serverRecommendations as BookingRecommendation[])
+        : [];
+      if (conflict) {
+        setConflictMessage(serverMessage || 'This time range conflicts with an existing booking.');
+        setRecommendations(parsedRecommendations);
+      }
       toast({
         title: conflict ? 'Time conflict detected' : 'Unable to save booking',
-        description: conflict ? (serverMessage || 'This time range conflicts with an existing booking.') : 'Please try again or contact admin.',
+        description: conflict
+          ? (parsedRecommendations.length > 0
+            ? `Found ${parsedRecommendations.length} alternative resource option(s).`
+            : (serverMessage || 'This time range conflicts with an existing booking.'))
+          : 'Please try again or contact admin.',
         variant: 'destructive',
       });
     } finally {
@@ -176,6 +152,40 @@ const NewBookingPage = () => {
               </Select>
               <input type="hidden" name="resourceId" value={form.resourceId} />
             </FormField>
+            {recommendations.length > 0 && (
+              <Alert className="border-amber-300 bg-amber-50/80">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Suggested Alternatives For The Same Time And Location</AlertTitle>
+                <AlertDescription>
+                  <p>{conflictMessage}</p>
+                  <div className="mt-3 grid gap-2">
+                    {recommendations.map(rec => (
+                      <div key={rec.resourceId} className="rounded-md border border-amber-200 bg-white p-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm">
+                          <p className="font-medium text-foreground">{rec.resourceName || rec.resourceId}</p>
+                          <p className="text-muted-foreground">
+                            {rec.resourceType} | {rec.location}
+                            {typeof rec.capacity === 'number' ? ` | Capacity ${rec.capacity}` : ''}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setForm(prev => ({ ...prev, resourceId: rec.resourceId }));
+                            setRecommendations([]);
+                            setErrors(prev => ({ ...prev, resourceId: '' }));
+                          }}
+                        >
+                          Use This Resource
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
             <FormField id="purpose" label="Purpose" error={errors.purpose}>
               <Input id="purpose" name="purpose" autoComplete="off" value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} placeholder="e.g., Guest Lecture on AI Ethics" />
             </FormField>

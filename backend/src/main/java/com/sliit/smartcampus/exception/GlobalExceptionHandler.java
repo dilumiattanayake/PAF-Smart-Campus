@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI());
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), ex.getDetails());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -64,9 +64,13 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, String path) {
-        return ResponseEntity.status(status)
-                .body(new ErrorResponse(Instant.now(), status.value(), message, path));
+        return build(status, message, path, null);
     }
 
-    public record ErrorResponse(Instant timestamp, int status, String message, String path) {}
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, String path, Map<String, Object> details) {
+        return ResponseEntity.status(status)
+                .body(new ErrorResponse(Instant.now(), status.value(), message, path, details));
+    }
+
+    public record ErrorResponse(Instant timestamp, int status, String message, String path, Map<String, Object> details) {}
 }

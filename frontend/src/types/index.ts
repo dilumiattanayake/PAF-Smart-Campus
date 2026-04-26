@@ -48,6 +48,16 @@ export interface Booking {
   createdAt: string;
 }
 
+export interface BookingRecommendation {
+  resourceId: string;
+  resourceName: string;
+  resourceType: string;
+  location: string;
+  capacity?: number;
+  availableFrom?: string;
+  availableTo?: string;
+}
+
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
