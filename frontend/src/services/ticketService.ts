@@ -99,10 +99,10 @@ export const ticketService = {
     const created = attachments.length > 0
       ? (await api.post<TicketApiResponse>('/api/tickets', (() => {
           const formData = new FormData();
-          formData.append('ticket', new Blob([JSON.stringify(requestBody)], { type: 'application/json' }));
+          formData.append('ticket', new Blob([JSON.stringify(requestBody)], { type: 'application/json' }), 'ticket.json');
           attachments.forEach(file => formData.append('attachments', file));
           return formData;
-        })(), { headers: { 'Content-Type': 'multipart/form-data' } })).data
+        })())).data
       : (await api.post<TicketApiResponse>('/api/tickets', requestBody)).data;
     return mapTicket(created);
   },

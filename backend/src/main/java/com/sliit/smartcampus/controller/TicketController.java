@@ -34,12 +34,12 @@ public class TicketController {
 
     private final TicketService ticketService;
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8"})
     public ResponseEntity<TicketResponse> create(@Valid @RequestBody TicketCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.create(request));
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE + ";charset=UTF-8"})
     public ResponseEntity<TicketResponse> createWithAttachments(
             @Valid @RequestPart("ticket") TicketCreateRequest request,
             @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments

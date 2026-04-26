@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -133,8 +134,11 @@ const NewTicketPage = () => {
       });
       toast({ title: 'Ticket created', description: 'Your maintenance request has been submitted.' });
       navigate('/tickets');
-    } catch {
-      toast({ title: 'Failed to create ticket', description: 'Please try again.' });
+    } catch (error) {
+      const message = isAxiosError<{ message?: string }>(error)
+        ? (error.response?.data?.message || 'Please try again.')
+        : 'Please try again.';
+      toast({ title: 'Failed to create ticket', description: message });
     } finally {
       setLoading(false);
     }

@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ArrowLeft, MapPin, User, Clock, MessageSquare, Pencil, Trash2, Check, X } from 'lucide-react';
+import { ArrowLeft, MapPin, User, Clock, MessageSquare, Pencil, Trash2, Check, X, Paperclip, ExternalLink } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ticketService } from '@/services/ticketService';
+import { api } from '@/services/authService';
 import { userService } from '@/services/userService';
 import type { Ticket, User as UserType } from '@/types';
 
@@ -32,6 +33,7 @@ const TicketDetailPage = () => {
   const [processingCommentId, setProcessingCommentId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<Ticket['status']>('OPEN');
   const [resolutionNotes, setResolutionNotes] = useState('');
+  const [openingAttachment, setOpeningAttachment] = useState<string | null>(null);
 
   const reloadTicket = async (ticketId: string) => {
     const updatedTicket = await ticketService.getById(ticketId);
@@ -111,6 +113,28 @@ const TicketDetailPage = () => {
 
   const handleStatusChange = (value: string) => {
     setNewStatus(value as Ticket['status']);
+  };
+
+  const getAttachmentLabel = (attachmentUrl: string) => {
+    const name = attachmentUrl.split('/').pop();
+    return name ? decodeURIComponent(name) : 'attachment';
+  };
+
+  const handleOpenAttachment = async (attachmentUrl: string) => {
+    setOpeningAttachment(attachmentUrl);
+    try {
+      const response = await api.get<Blob>(attachmentUrl, { responseType: 'blob' });
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data], { type: response.headers['content-type'] || 'application/octet-stream' });
+      const objectUrl = URL.createObjectURL(blob);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch {
+      toast({ title: 'Failed to open attachment', variant: 'destructive' });
+    } finally {
+      setOpeningAttachment(null);
+    }
   };
 
   const handlePostComment = async () => {
@@ -227,6 +251,32 @@ const TicketDetailPage = () => {
                     {ticket.status === 'REJECTED' ? 'Rejection Reason' : 'Resolution Notes'}
                   </p>
                   <p className="text-sm">{ticket.resolutionNotes}</p>
+                </div>
+              )}
+
+              {ticket.attachments && ticket.attachments.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-semibold">Attachments</p>
+                  <div className="space-y-2">
+                    {ticket.attachments.map(attachment => (
+                      <div key={attachment} className="flex items-center justify-between rounded-md border px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm truncate">{getAttachmentLabel(attachment)}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenAttachment(attachment)}
+                          disabled={openingAttachment === attachment}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          {openingAttachment === attachment ? 'Opening...' : 'View'}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -350,7 +400,7 @@ const TicketDetailPage = () => {
                       {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED'].map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Textarea placeholder="Resolution notes..." value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} rows={2} />
+                  <Textarea placeholder="Notes..." value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} rows={2} />
                   <Button size="sm" className="w-full" onClick={handleStatusUpdate}>Update Status</Button>
                 </CardContent>
               </Card>
@@ -368,7 +418,7 @@ const TicketDetailPage = () => {
                     {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Textarea placeholder="Resolution notes..." value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} rows={2} />
+                <Textarea placeholder="Notes..." value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} rows={2} />
                 <Button size="sm" className="w-full" onClick={handleStatusUpdate}>Update Status</Button>
               </CardContent>
             </Card>
