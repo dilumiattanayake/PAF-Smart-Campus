@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,21 @@ import { resourceService } from '@/services/resourceService';
 import type { Resource } from '@/types';
 
 type FieldProps = { id: string; label: string; error?: string; children: React.ReactNode };
+
+const MAX_NAME_LENGTH = 100;
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_LOCATION_LENGTH = 100;
+const MAX_CAPACITY = 1000;
+
+const isValidUrl = (value: string) => {
+  if (!value.trim()) return false;
+  return /^https?:\/\/[\w\-@:/?&=.]+=*$/i.test(value);
+};
+
+const parseTimeValue = (value: string) => {
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+};
 
 const FormField = ({ id, label, error, children }: FieldProps) => (
   <div className="space-y-2">
@@ -75,19 +90,64 @@ const AdminResourceFormPage = () => {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.name.trim()) e.name = 'Required';
-    if (!form.type) e.type = 'Required';
-    if (!form.status) e.status = 'Required';
-    if (!form.location.trim()) e.location = 'Required';
-    if (!form.capacity || Number(form.capacity) < 1) e.capacity = 'Must be at least 1';
-    if ((form.availableFrom && !form.availableTo) || (!form.availableFrom && form.availableTo)) {
+    const trimmedName = form.name.trim();
+    const trimmedLocation = form.location.trim();
+    const trimmedDescription = form.description.trim();
+
+    if (!trimmedName) {
+      e.name = 'Required';
+    } else if (trimmedName.length < 3) {
+      e.name = 'At least 3 characters';
+    } else if (trimmedName.length > MAX_NAME_LENGTH) {
+      e.name = `Maximum ${MAX_NAME_LENGTH} characters`;
+    }
+
+    if (!form.type.trim()) {
+      e.type = 'Required';
+    }
+
+    if (!form.status) {
+      e.status = 'Required';
+    }
+
+    if (!trimmedLocation) {
+      e.location = 'Required';
+    } else if (trimmedLocation.length < 3) {
+      e.location = 'Enter a valid location';
+    } else if (trimmedLocation.length > MAX_LOCATION_LENGTH) {
+      e.location = `Maximum ${MAX_LOCATION_LENGTH} characters`;
+    }
+
+    if (!form.capacity) {
+      e.capacity = 'Required';
+    } else if (!Number.isInteger(Number(form.capacity))) {
+      e.capacity = 'Must be a whole number';
+    } else if (Number(form.capacity) < 1) {
+      e.capacity = 'Must be at least 1';
+    } else if (Number(form.capacity) > MAX_CAPACITY) {
+      e.capacity = `Must not exceed ${MAX_CAPACITY}`;
+    }
+
+    if (trimmedDescription && trimmedDescription.length > MAX_DESCRIPTION_LENGTH) {
+      e.description = `Description cannot exceed ${MAX_DESCRIPTION_LENGTH} characters`;
+    }
+
+    if (form.image && !isValidUrl(form.image)) {
+      e.image = 'Enter a valid URL starting with https:// or http://';
+    }
+
+    const hasFrom = Boolean(form.availableFrom);
+    const hasTo = Boolean(form.availableTo);
+    if (hasFrom !== hasTo) {
       e.availableFrom = 'Start and end time required';
       e.availableTo = 'Start and end time required';
+    } else if (hasFrom && hasTo) {
+      if (parseTimeValue(form.availableFrom) >= parseTimeValue(form.availableTo)) {
+        e.availableFrom = 'Start time must be before end time';
+        e.availableTo = 'End time must be after start time';
+      }
     }
-    if (form.availableFrom && form.availableTo && form.availableFrom >= form.availableTo) {
-      e.availableFrom = 'Start time must be before end time';
-      e.availableTo = 'End time must be after start time';
-    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
