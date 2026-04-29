@@ -256,23 +256,16 @@ public class BookingServiceImpl implements BookingService {
     private List<BookingRecommendation> findAlternativeResources(Booking booking) {
         Resource requestedResource = resourceRepository.findById(booking.getResourceId()).orElse(null);
         String requestedLocation = requestedResource != null ? requestedResource.getLocation() : null;
-        if (requestedLocation == null || requestedLocation.isBlank()) {
-            return List.of();
-        }
-
+        
         int requiredCapacity = booking.getAttendeeCount() != null ? booking.getAttendeeCount() : 0;
-        List<BookingRecommendation> alternatives = new ArrayList<>();
+        List<BookingRecommendation> sameLocationAlternatives = new ArrayList<>();
+        List<BookingRecommendation> otherLocationAlternatives = new ArrayList<>();
 
         for (Resource candidate : resourceRepository.findAll()) {
             if (candidate == null || candidate.getId() == null) {
                 continue;
             }
             if (candidate.getId().equals(booking.getResourceId())) {
-                continue;
-            }
-            if (candidate.getLocation() == null
-                    || !candidate.getLocation().trim().toLowerCase(Locale.ROOT)
-                    .equals(requestedLocation.trim().toLowerCase(Locale.ROOT))) {
                 continue;
             }
             ResourceStatus status = candidate.getStatus();
@@ -289,7 +282,7 @@ public class BookingServiceImpl implements BookingService {
                 continue;
             }
 
-            alternatives.add(BookingRecommendation.builder()
+            BookingRecommendation rec = BookingRecommendation.builder()
                     .resourceId(candidate.getId())
                     .resourceName(candidate.getName())
                     .resourceType(candidate.getType())
@@ -297,12 +290,30 @@ public class BookingServiceImpl implements BookingService {
                     .capacity(candidate.getCapacity())
                     .availableFrom(candidate.getAvailableFrom())
                     .availableTo(candidate.getAvailableTo())
-                    .build());
+                    .build();
+
+            // Prioritize same location
+            if (requestedLocation != null && candidate.getLocation() != null
+                    && candidate.getLocation().trim().toLowerCase(Locale.ROOT)
+                    .equals(requestedLocation.trim().toLowerCase(Locale.ROOT))) {
+                sameLocationAlternatives.add(rec);
+            } else {
+                otherLocationAlternatives.add(rec);
+            }
         }
 
-        return alternatives.stream()
+        // Combine: same location first (sorted by capacity distance), then others
+        List<BookingRecommendation> combined = new ArrayList<>();
+        combined.addAll(sameLocationAlternatives.stream()
                 .sorted(Comparator.comparing((BookingRecommendation r) -> capacityDistance(r.getCapacity(), requiredCapacity))
                         .thenComparing(r -> r.getResourceName() == null ? "" : r.getResourceName(), String.CASE_INSENSITIVE_ORDER))
+                .toList());
+        combined.addAll(otherLocationAlternatives.stream()
+                .sorted(Comparator.comparing((BookingRecommendation r) -> capacityDistance(r.getCapacity(), requiredCapacity))
+                        .thenComparing(r -> r.getResourceName() == null ? "" : r.getResourceName(), String.CASE_INSENSITIVE_ORDER))
+                .toList());
+
+        return combined.stream()
                 .limit(5)
                 .toList();
     }
