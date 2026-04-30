@@ -116,16 +116,20 @@ const NewBookingPage = () => {
       if (conflict) {
         setConflictMessage(serverMessage || 'This time range conflicts with an existing booking.');
         setRecommendations(parsedRecommendations);
+        toast({
+          title: 'Time conflict detected',
+          description: parsedRecommendations.length > 0
+            ? `Found ${parsedRecommendations.length} alternative resource(s) available at the same time.`
+            : (serverMessage || 'This time range conflicts with an existing booking. No alternatives available.'),
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Unable to save booking',
+          description: 'Please try again or contact admin.',
+          variant: 'destructive',
+        });
       }
-      toast({
-        title: conflict ? 'Time conflict detected' : 'Unable to save booking',
-        description: conflict
-          ? (parsedRecommendations.length > 0
-            ? `Found ${parsedRecommendations.length} alternative resource option(s).`
-            : (serverMessage || 'This time range conflicts with an existing booking.'))
-          : 'Please try again or contact admin.',
-        variant: 'destructive',
-      });
     } finally {
       setLoading(false);
     }
@@ -152,12 +156,65 @@ const NewBookingPage = () => {
               </Select>
               <input type="hidden" name="resourceId" value={form.resourceId} />
             </FormField>
-            {recommendations.length > 0 && (
+            {conflictMessage && (
+              <>
+                <Alert className="border-red-300 bg-red-50/80">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Time Conflict Detected</AlertTitle>
+                  <AlertDescription>
+                    <p className="text-sm font-medium">{conflictMessage}</p>
+                  </AlertDescription>
+                </Alert>
+                {recommendations.length > 0 && (
+                  <Alert className="border-amber-300 bg-amber-50/80">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Suggested Alternatives For The Same Time And Location</AlertTitle>
+                    <AlertDescription>
+                      <div className="mt-3 grid gap-2">
+                        {recommendations.map(rec => (
+                          <div key={rec.resourceId} className="rounded-md border border-amber-200 bg-white p-3 flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm">
+                              <p className="font-medium text-foreground">{rec.resourceName || rec.resourceId}</p>
+                              <p className="text-muted-foreground">
+                                {rec.resourceType} | {rec.location}
+                                {typeof rec.capacity === 'number' ? ` | Capacity ${rec.capacity}` : ''}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setForm(prev => ({ ...prev, resourceId: rec.resourceId }));
+                                setRecommendations([]);
+                                setConflictMessage('');
+                                setErrors(prev => ({ ...prev, resourceId: '' }));
+                              }}
+                            >
+                              Use This Resource
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {recommendations.length === 0 && (
+                  <Alert className="border-amber-300 bg-amber-50/80">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>No Alternative Resources Available</AlertTitle>
+                    <AlertDescription>
+                      <p className="text-sm">No suitable alternative resources were found for the same time and location. Please try a different date/time or select another resource.</p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </>
+            )}
+            {recommendations.length > 0 && !conflictMessage && (
               <Alert className="border-amber-300 bg-amber-50/80">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Suggested Alternatives For The Same Time And Location</AlertTitle>
                 <AlertDescription>
-                  <p>{conflictMessage}</p>
                   <div className="mt-3 grid gap-2">
                     {recommendations.map(rec => (
                       <div key={rec.resourceId} className="rounded-md border border-amber-200 bg-white p-3 flex flex-wrap items-center justify-between gap-2">
@@ -175,6 +232,7 @@ const NewBookingPage = () => {
                           onClick={() => {
                             setForm(prev => ({ ...prev, resourceId: rec.resourceId }));
                             setRecommendations([]);
+                            setConflictMessage('');
                             setErrors(prev => ({ ...prev, resourceId: '' }));
                           }}
                         >
